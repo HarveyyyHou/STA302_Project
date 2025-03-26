@@ -383,6 +383,249 @@ summary_table %>%
   column_spec(2:min(ncol(summary_table), 5), width = "2cm")
 
 ```
+```{r}
+library(gridExtra)
 
+# Add fitted values to df_clean
+df_clean$fitted_values <- model$fitted.values
+
+# Function for ggplot with regression line
+ggplot_with_abline <- function(df, xcol, xlabel) {
+  ggplot(df, aes(x = .data[[xcol]], y = fitted_values)) +
+    geom_point(color = "blue") +
+    geom_smooth(method = "lm", color = "red", se = FALSE) +
+    labs(title = paste(xlabel, "vs y-hat"), x = xlabel, y = "y-hat") +
+    theme_minimal()
+}
+
+# Create plots
+ # Create boxplot for School_Type
+p1 <- ggplot(df_clean, aes(x = School_Type, y = fitted_values)) +
+  geom_boxplot(aes(fill = School_Type), outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
+  labs(title = "School Type vs y-hat", x = "School Type", y = "y-hat") +
+  theme_minimal()
+
+# Create boxplot for School_Language
+p2 <- ggplot(df_clean, aes(x = School_Language, y = fitted_values)) +
+  geom_boxplot(aes(fill = School_Language), outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
+  labs(title = "School Language vs y-hat", x = "School Language", y = "y-hat") +
+  theme_minimal()
+
+p3 <- ggplot_with_abline(df_clean, "Special_Ed_Pct", "Special Ed Pct")
+p4 <- ggplot_with_abline(df_clean, "Low_Income_sqrt", "Low Income Pct")
+
+
+p5 <- ggplot_with_abline(df_clean, "No_Parent_Degree_Pct", "No Parent Degree Pct")
+
+# Arrange plots in a grid
+grid.arrange(p1, p2, p3, p4, p5, ncol = 3, nrow = 2)
+```
+
+```{r}
+par(mfrow = c(1, 3))  # Arrange plots in one row
+
+#df_clean$OSSLT_First_Attempt_PassRate = df_clean$OSSLT_First_Attempt_PassRate +0.001
+summary(df_clean$OSSLT_First_Attempt_PassRate)
+
+model <- lm(OSSLT_First_Attempt_PassRate ~ 
+             School_Type + 
+             School_Language + 
+             Special_Ed_Pct + 
+             Low_Income_Pct + 
+             No_Parent_Degree_Pct, 
+             data = df_clean)
+
+# Residuals vs Fitted
+plot(model$fitted.values, resid(model), main="Residuals vs Fitted", 
+     xlab="Fitted Values", ylab="Residuals", pch=20) 
+
+ggplot(data.frame(resid(model)), aes(sample = resid(model))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals")
+
+# Histogram of Residuals
+hist(resid(model), main="Histogram of Residuals", 
+     xlab="Residuals", col="gray", border="white")
+par(mfrow = c(1, 1))
+
+summary(df_clean$OSSLT_First_Attempt_PassRate)
+library(car)
+library(MASS)
+boxcox_result <- boxcox(model, plotit = TRUE)  # Plot to find optimal lambda
+lambda <- boxcox_result$x[which.max(boxcox_result$y)]
+lambda
+
+df_clean$OSSLT_Transform = log(df_clean$OSSLT_First_Attempt_PassRate)
+model_transformed <- lm(OSSLT_Transform ~ School_Type + School_Language + 
+                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
+                       data = df_clean)
+df_clean$OSSLT_Sqrt = sqrt(df_clean$OSSLT_First_Attempt_PassRate)
+model_sqrt <- lm(OSSLT_Sqrt ~ School_Type + School_Language + 
+                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
+                       data = df_clean)
+df_clean$OSSLT_Cube = (df_clean$OSSLT_First_Attempt_PassRate)^3
+model_cube <- lm(OSSLT_Cube ~ School_Type + School_Language + 
+                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
+                       data = df_clean)
+
+
+# Q-Q plot for the original model
+p1 = ggplot(data.frame(resid(model)), aes(sample = resid(model))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals")
+
+# Q-Q plot for the transformed model
+p2 = ggplot(data.frame(resid(model_transformed)), aes(sample = resid(model_transformed))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(Log)")
+
+p3 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(Sqrt)")
+
+p4 = ggplot(data.frame(resid(model_cube)), aes(sample = resid(model_cube))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(Cube)")
+
+grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+
+# summary(model_transformed)
+```
+
+```{r}
+library(gridExtra)
+# Create individual ggplots
+p1 <- ggplot(data.frame(Fitted = model$fitted.values, Residuals = resid(model)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "blue") +
+  ggtitle("Original Residuals") +
+  theme_minimal()
+
+p2 <- ggplot(data.frame(Fitted = model_transformed$fitted.values, 
+                       Residuals = resid(model_transformed)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Log-Transformed Residuals") +
+  theme_minimal()
+
+
+p3 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, 
+                       Residuals = resid(model_sqrt)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "darkgreen") +
+  ggtitle("Sqrt-Transformed Residuals") +
+  theme_minimal()
+
+p4 <- ggplot(data.frame(Fitted = model_cube$fitted.values, 
+                       Residuals = resid(model_cube)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "purple") +
+  ggtitle("cube-Transformed Residuals") +
+  theme_minimal()
+
+
+grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+
+```
+
+```{R}
+
+AIC_original <- AIC(model)
+AIC_log <- AIC(model_transformed)
+AIC_sqrt <- AIC(model_sqrt)
+AIC_cube <- AIC(model_cube)
+
+
+# Compare AIC values
+aic_comparison <- data.frame(
+  Model = c("Original", "Log-Transformed", "Sqrt-Transformed","Cube"),
+  AIC = c(AIC_original, AIC_log, AIC_sqrt, AIC_cube)
+)
+
+# Print the results
+print(aic_comparison)
+
+install.packages("moments")
+library(moments)
+skewness(df_clean$OSSLT_First_Attempt_PassRate)
+
+#Cannot be used when reponse variable is transformed, cuz scales differ
+summary(model)$adj.r.squared
+summary(model_transformed)$adj.r.squared
+
+```
+
+```{r}
+
+df_clean$Sp_Ed_Transform = (df_clean$Special_Ed_Pct)
+df_clean$Low_Income_Transform = (df_clean$Low_Income_Pct)
+df_clean$No_Edu_Transform = (df_clean$No_Parent_Degree_Pct)
+cor(df_clean[, c("Sp_Ed_Transform", "Low_Income_Transform", "No_Edu_Transform")])
+model_Transformwith_x <- lm(OSSLT_Sqrt ~ School_Type + School_Language + 
+                       Sp_Ed_Transform + Low_Income_Transform + No_Edu_Transform, 
+                       data = df_clean)
+
+plot1 <- ggplot(df_clean, aes(x = Sp_Ed_Transform)) +
+  geom_histogram(fill = "lightgreen", bins = 30) +
+  labs(title = "Special Education Services Transform", x = "Percentage", y = "Count") +
+  theme_minimal()+
+  theme(plot.title = element_text(size = 8, face = "bold"))
+
+plot2 <- ggplot(df_clean, aes(x = Low_Income_Transform)) +
+  geom_histogram(fill = "blue", bins = 30) +
+  labs(title = "Low Income Transform", x = "Percentage", y = "Count") +
+  theme_minimal()+
+  theme(plot.title = element_text(size = 8, face = "bold"))
+
+plot3 <- ggplot(df_clean, aes(x = No_Edu_Transform)) +
+  geom_histogram(fill = "red", bins = 30) +
+  labs(title = " Parent Education Transform", x = "Percentage", y = "Count") +
+  theme_minimal()+
+  theme(plot.title = element_text(size = 8, face = "bold"))
+
+grid.arrange(plot1, plot2, plot3, ncol = 2, nrow = 2)
+
+```
+
+```{R}
+p2 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(sqrt)")
+
+p3 = ggplot(data.frame(resid(model_Transformwith_x)), aes(sample = resid(model_Transformwith_x))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(sqrt with sqrt X)")
+
+grid.arrange( p2, p3, ncol = 2)
+
+```
+
+``` {R}
+p2 <- ggplot(data.frame(Fitted = model_transformed$fitted.values, 
+                       Residuals = resid(model_transformed)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Log-Transformed only Y Residuals") +
+  theme_minimal()
+
+p3 <- ggplot(data.frame(Fitted = model_Logwith_x$fitted.values, 
+                       Residuals = resid(model_Transformwith_x)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Sqrt -Transformed with x transform Residuals") +
+  theme_minimal()
+
+grid.arrange(p2, p3, ncol = 2)
+
+summary(model_Logwith_x)
+AIC(model_transformed, model_Logwith_x)
+```
 \newpage
 # References
