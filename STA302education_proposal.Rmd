@@ -149,6 +149,9 @@ The `OSSLT_First_Attempt_PassRate`, the response variable, measures the percenta
 #| tbl-cap: "OSSLT First Attempt Pass Rate Descriptive Statistics"
 #| echo: false
 
+df_clean <- read.csv("C:/Users/houju/Desktop/Data_Analysis_SelfLearn/STA302 Part 1 Submission/STA302 Part 1 Submission/cleaned_data_school.csv")
+
+
 summary_table <- describe(df_clean %>% select(`OSSLT_First_Attempt_PassRate`)) %>%  
   select(-vars) %>%  
   mutate(across(where(is.numeric), ~ round(., 2)))  
@@ -235,7 +238,8 @@ The percentage of students whose parents lack post-secondary credentials average
 #| label: table-regression
 #| fig-cap: Regression Results
 #| echo: false
-
+#install.packages("car")
+library(car)
 
 # Fit the linear model
 model <- lm(OSSLT_First_Attempt_PassRate ~ 
@@ -285,7 +289,7 @@ $$
 #| label: plot-residuals
 #| fig-cap: Residual Plots
 #| echo: false
-
+plot.new
 par(mfrow = c(1, 3))  # Arrange plots in one row
 
 # Residuals vs Fitted
@@ -343,16 +347,11 @@ Our findings align with prior research while offering insights specific to Ontar
 
 
 
-\newpage
-
-\appendix
-
-# Appendix
-
 ```{r}
 #| label: tbl-predictors
 #| tbl-cap: "Descriptive Statistics for Selected Predictors"
 #| echo: false
+
 
 
 # Create the summary table using the renamed columns
@@ -383,6 +382,494 @@ summary_table %>%
   column_spec(2:min(ncol(summary_table), 5), width = "2cm")
 
 ```
+
+
+### Obtain Box Cox Suggestion
+```{r}
+#| label: Box Cox
+#| tbl-cap: "Box Cox"
+#| echo: false
+df_clean$OSSLT_First_Attempt_PassRate = df_clean$OSSLT_First_Attempt_PassRate +0.001
+
+model <- lm(OSSLT_First_Attempt_PassRate ~ 
+             School_Type + 
+             School_Language + 
+             Special_Ed_Pct + 
+             Low_Income_Pct + 
+             No_Parent_Degree_Pct, 
+             data = df_clean)
+library(car)
+library(MASS)
+boxcox_result <- boxcox(model, plotit = FALSE)  # Plot to find optimal 
+lambda <- boxcox_result$x[which.max(boxcox_result$y)]
+lambda
+```
+### Response Variable Transformation Preview with QQ
+- We got 2 as Box Cox lambda, Therefore we Try Y^2 Transformation, we also tried many other transformations such as 1/Y, and decided to show Log and Square Root and they are the most improved Models.
+```{r residual-plots}
+#| label: Response Variable Transformation Preview with QQ
+#| fig-cap: Residual Plots
+#| echo: false
+
+df_clean$OSSLT_Transform = log(df_clean$OSSLT_First_Attempt_PassRate+0.001)
+model_transformed <- lm(OSSLT_Transform ~ School_Type + School_Language + 
+                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
+                       data = df_clean)
+df_clean$OSSLT_Sqrt = sqrt(df_clean$OSSLT_First_Attempt_PassRate)
+model_sqrt <- lm(OSSLT_Sqrt ~ School_Type + School_Language + 
+                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
+                       data = df_clean)
+df_clean$OSSLT_Square = (df_clean$OSSLT_First_Attempt_PassRate)^2
+model_square <- lm(OSSLT_Square ~ School_Type + School_Language + 
+                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
+                       data = df_clean)
+
+
+# Q-Q plot for the original model
+p1 = ggplot(data.frame(resid(model)), aes(sample = resid(model))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals")
+
+# Q-Q plot for the transformed model
+p2 = ggplot(data.frame(resid(model_transformed)), aes(sample = resid(model_transformed))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(Log)")
+
+p3 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(Sqrt)")
+
+p4 = ggplot(data.frame(resid(model_square)), aes(sample = resid(model_square))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(Square)")
+
+grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+
+# summary(model_transformed)
+```
+### Response Variable Transformation Preview with Residuals
+- Square root looks the best for residual plot
+```{r residual-plots}
+#| label: Response Variable Transformation Preview with Residuals
+#| fig-cap: Residual Plots
+#| echo: false
+library(gridExtra)
+# Create individual ggplots
+p1 <- ggplot(data.frame(Fitted = model$fitted.values, Residuals = resid(model)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "blue") +
+  ggtitle("Original Residuals") +
+  theme_minimal()
+
+p2 <- ggplot(data.frame(Fitted = model_transformed$fitted.values, 
+                       Residuals = resid(model_transformed)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Log-Transformed Residuals") +
+  theme_minimal()
+
+
+p3 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, 
+                       Residuals = resid(model_sqrt)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "darkgreen") +
+  ggtitle("Sqrt-Transformed Residuals") +
+  theme_minimal()
+
+p4 <- ggplot(data.frame(Fitted = model_square$fitted.values, 
+                       Residuals = resid(model_square)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "purple") +
+  ggtitle("square-Transformed Residuals") +
+  theme_minimal()
+
+
+grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+
+```
+### Response Variable Transformation Decision
+- We eliminate Square since the model performs worse in every aspect. We need to choose one between Log and Square Root Transformation that both improve from the original model. We ended up with Square root since R squared for square root is significantly higher to Log. The difference in AIC, BIC and AICc is not significant enough to replace R^2.
+```{R}
+#| label: Y Transformation Decision
+#| tbl-cap: "R^2, AIC, BIC, AICc"
+#| echo: false
+#install.packages("MuMIn")
+library(MuMIn)
+
+AIC_original <- AIC(model)
+AIC_log <- AIC(model_transformed)
+AIC_sqrt <- AIC(model_sqrt)
+AIC_square <- AIC(model_square)
+BIC_original <- BIC(model)
+BIC_log <- BIC(model_transformed)
+BIC_sqrt <- BIC(model_sqrt)
+BIC_square <- BIC(model_square)
+AICc_original <- AICc(model)
+AICc_log <- AICc(model_transformed)
+AICc_sqrt <- AICc(model_sqrt)
+AICc_square <- AICc(model_square)
+Ori_R = summary(model)$adj.r.squared
+Log_R = summary(model_transformed)$adj.r.squared
+Sqrt_R = summary(model_sqrt)$adj.r.squared
+Square_R = summary(model_square)$adj.r.squared
+
+# Compare AIC values
+ytransform_comparison <- data.frame(
+  Model = c("Original", "Log-Transformed", "Sqrt-Transformed","Square"),
+  R_Squared = c(Ori_R, Log_R, Sqrt_R, Square_R),
+  AIC = c(AIC_original, AIC_log, AIC_sqrt, AIC_square),
+  BIC = c(BIC_original, BIC_log, BIC_sqrt, BIC_square),
+  AICc = c(AICc_original, AICc_log, AICc_sqrt, AICc_square)
+)
+
+# Print the results
+print(ytransform_comparison)
+
+```
+
+### Y transformed model summary, VIF and Confidence Interval
+- Confidence Interval contains 0 and p value >0.05 for School_Type, Suggest dropping this predictor.
+```{r}
+#| label: VIF, Confidence Interval and Summary
+#| tbl-cap: "VIF, Confidence Interval and Summary"
+#| echo: false
+summary(model_sqrt)
+vif_values <- vif(model_sqrt)
+print(vif_values)
+confint(model_sqrt)
+```
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+df_clean$Sp_Ed_Transform = (df_clean$Special_Ed_Pct)^2
+df_clean$Low_Income_Transform = (df_clean$Low_Income_Pct)
+df_clean$No_Edu_Transform = (df_clean$No_Parent_Degree_Pct)
+model_Transformwith_x <- lm(OSSLT_Sqrt ~ School_Type + School_Language + Special_Ed_Pct + Sp_Ed_Transform + Low_Income_Transform + No_Edu_Transform, data = df_clean)
+
+model_OneLessPredictor <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Sp_Ed_Transform + Low_Income_Transform + No_Edu_Transform, data = df_clean)
+
+model_drop_No_Add <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Income_Transform + No_Edu_Transform, data = df_clean)
+
+```
+### X Transformation QQ Preview
+```{R}
+#| label: QQ
+#| tbl-cap: "QQ of all possible X Transformation"
+#| echo: false
+p2 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of Residuals(sqrt)")
+
+p3 = ggplot(data.frame(resid(model_Transformwith_x)), aes(sample = resid(model_Transformwith_x))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("With Polynomial Term On Spec EDU")
+
+p4 = ggplot(data.frame(resid(model_OneLessPredictor)), aes(sample = resid(model_OneLessPredictor))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Removing School Type with extra Term")
+
+p5 = ggplot(data.frame(resid(model_drop_No_Add)), aes(sample = resid(model_drop_No_Add))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Removing School Type")
+
+grid.arrange( p2, p3, p4, p5, ncol = 2)
+
+```
+
+### X Transformation Residual Plots
+```{r residual-plots}
+#| label: X Transformation Residual Plots
+#| fig-cap: Residual Plots
+#| echo: false
+p2 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, 
+                       Residuals = resid(model_sqrt)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Sqrt Transformed only Y Residuals") +
+  theme_minimal()
+
+p3 <- ggplot(data.frame(Fitted = model_Transformwith_x$fitted.values, 
+                       Residuals = resid(model_Transformwith_x)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("With Polynomial Term On Spec EDU") +
+  theme_minimal()
+
+p4 <- ggplot(data.frame(Fitted = model_OneLessPredictor$fitted.values, 
+                       Residuals = resid(model_OneLessPredictor)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Removing School Type with extra Term") +
+  theme_minimal()
+
+p5 <- ggplot(data.frame(Fitted = model_drop_No_Add$fitted.values, 
+                       Residuals = resid(model_drop_No_Add)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Removing School Type") +
+  theme_minimal()
+
+grid.arrange(p2, p3, p4, p5, ncol = 2)
+```
+
+### Predictor Transformation Decision
+- We decide to choose Model 3: X Transform with one less Predictor, since the R^2, AIC, BIC, AICc improved from the original sqrt-Transformed. Model 2 is slightly better but it contains an extra predictor.
+```{R}
+#| label: Predictor Transformation Decision
+#| tbl-cap: "Predictor Transformation Decision"
+#| echo: false
+#install.packages("leaps")
+library(leaps)
+# Extract AIC values (second element of extractAIC() output)
+AIC_values <- c(
+  extractAIC(model_sqrt)[2],
+  extractAIC(model_Transformwith_x)[2],
+  extractAIC(model_OneLessPredictor)[2],
+  extractAIC(model_drop_No_Add)[2]
+)
+
+# Extract other metrics
+BIC_values <- c(
+  BIC(model_sqrt),
+  BIC(model_Transformwith_x),
+  BIC(model_OneLessPredictor),
+  BIC(model_drop_No_Add)
+)
+
+AICc_values <- c(
+  AICc(model_sqrt),
+  AICc(model_Transformwith_x),
+  AICc(model_OneLessPredictor),
+  AICc(model_drop_No_Add)
+)
+
+R_squared <- c(
+  summary(model_sqrt)$adj.r.squared,
+  summary(model_Transformwith_x)$adj.r.squared,
+  summary(model_OneLessPredictor)$adj.r.squared,
+  summary(model_drop_No_Add)$adj.r.squared
+)
+
+# Create comparison table
+xtransform_comparison <- data.frame(
+  Model = c("Sqrt-Transformed", "X Transform", "X Transform with one less Predictor", "One Less Predictor"),
+  R_Squared = R_squared,
+  AIC = AIC_values,
+  BIC = BIC_values,
+  AICc = AICc_values
+)
+
+# Print results
+print(xtransform_comparison)
+```
+
+### Anova Table for X Transformation
+- Finally, we can conclude the final model with 5 Predictors: School Language, Special Education Percentage, Special Education Percentage Squared, Lower Income background and Parents with no Education. Because RSS improved.
+```{R}
+#| label: Anova Table for X Transformation
+#| tbl-cap: "Anova Table for X Transformation"
+#| echo: false
+#summary(model_sqrt)
+#summary(model_Transformwith_x)
+#summary(model_OneLessPredictor)
+anova(model_Transformwith_x, model_sqrt)
+anova(model_OneLessPredictor, model_sqrt)
+anova(model_drop_No_Add, model_sqrt)
+```
+
+### Outlier Detection and Removal
+- 211,385,102,118,225,484,533. These columns appear under several different tests, so we tried to fit the model after removing these.
+```{R}
+#| label: Outlier Detection and Removal
+#| tbl-cap: "Outlier Detection and Removal"
+#| echo: false
+# Fit your model
+# model_OneLessPredictor
+model <- model_OneLessPredictor
+
+# ----------------------------
+# 1. Residual Diagnostics
+# ----------------------------
+# Standardized residuals (for |r_i| > 4)
+standardized_resid <- rstandard(model)
+std_resid_outliers <- which(abs(standardized_resid) > 4)
+
+# Studentized residuals (for |rstudent| > 3)
+rstudent <- rstudent(model)
+student_resid_outliers <- which(abs(rstudent) > 3)
+
+# ----------------------------
+# 2. Leverage and Influence Metrics
+# ----------------------------
+# Leverage (hat values)
+hat_values <- hatvalues(model)
+leverage_threshold <- 2 * (length(coef(model)) + 1) / nobs(model)
+high_leverage <- which(hat_values > leverage_threshold)
+
+# Cook's distance
+cooks_d <- cooks.distance(model)
+cooks_threshold <- 4 / nobs(model)
+influential_cooks <- which(cooks_d > cooks_threshold)
+
+# DFFITS
+dffits_val <- dffits(model)
+dffits_threshold <- 2 * sqrt(length(coef(model)) / nobs(model))
+high_dffits <- which(abs(dffits_val) > dffits_threshold)
+
+# DFBETAS
+dfbetas_val <- dfbetas(model)
+dfbetas_threshold <- 2 / sqrt(nobs(model))
+high_dfbetas <- which(apply(abs(dfbetas_val), 1, max) > dfbetas_threshold)
+
+# ----------------------------
+# 3. Print Results
+# ----------------------------
+cat("=== Outliers ===\n")
+cat("Standardized residuals (|r_i| > 4):", std_resid_outliers, "\n")
+cat("Studentized residuals (|rstudent| > 3):", student_resid_outliers, "\n\n")
+
+cat("=== Influence Metrics ===\n")
+cat("High Leverage (Hat >", round(leverage_threshold, 3), "):", high_leverage, "\n")
+cat("Influential (Cook's D >", round(cooks_threshold, 3), "):", influential_cooks, "\n")
+cat("High DFFITS (>", round(dffits_threshold, 3), "):", high_dffits, "\n")
+cat("High DFBETAS (>", round(dfbetas_threshold, 3), "):", high_dfbetas, "\n")
+
+# ----------------------------
+# 4. Visualization
+# ----------------------------
+par(mfrow = c(2, 2))
+
+# Standardized Residuals Plot
+plot(standardized_resid, pch = 20, 
+     main = "Standardized Residuals (|r_i| > 4)", 
+     ylab = "Standardized Residuals")
+abline(h = c(-4, 4), col = "red", lty = 2)
+
+# Leverage vs. Standardized Residuals
+plot(hat_values, standardized_resid, pch = 20,
+     main = "Leverage vs. Standardized Residuals",
+     xlab = "Leverage (Hat Values)", ylab = "Standardized Residuals")
+abline(h = c(-4, 4), col = "red", lty = 2)
+abline(v = leverage_threshold, col = "blue", lty = 2)
+
+# Cook's Distance
+plot(cooks_d, pch = 20, main = "Cook's Distance")
+abline(h = cooks_threshold, col = "red", lty = 2)
+
+# DFBETAS for the most affected predictor
+most_affected_pred <- which.max(apply(abs(dfbetas_val), 2, max))
+plot(dfbetas_val[, most_affected_pred], pch = 20,
+     main = paste("DFBETAS for", names(coef(model))[most_affected_pred]),
+     ylab = "DFBETAS")
+abline(h = c(-dfbetas_threshold, dfbetas_threshold), col = "red", lty = 2)
+```
+- Cleaned Model Summary(Without outliers) and Confidence Interval
+```{R}
+#| label: Summary
+#| tbl-cap: "Cleaned Model Summary(Without outliers) and Confidence Interval"
+#| echo: false
+#df_clean[c(211, 385), ] 
+model_clean <- update(model_OneLessPredictor, 
+                     data = df_clean[-c(211, 385, 102, 118, 225, 484, 533), ])
+summary(model_clean)
+confint(model_clean)
+#summary(model_OneLessPredictor)
+```
+
+### Assess Model Performance after removing outlier
+- Hooray, AIC, BIC, AICc, R^2 all improved significant enough to conclude the removing outlier process.
+```{R}
+#| label: Assess Model Performance after removing outlier
+#| tbl-cap: "Assess Model Performance after removing outlier"
+#| echo: false
+#Anova, AIC, BIC ...
+#install.packages("leaps")
+library(leaps)
+# Extract AIC values (second element of extractAIC() output)
+AIC_values <- c(
+  extractAIC(model_OneLessPredictor)[2],
+  extractAIC(model_clean)[2]
+)
+
+# Extract other metrics
+BIC_values <- c(
+  BIC(model_OneLessPredictor),
+  BIC(model_clean)
+)
+
+AICc_values <- c(
+  AICc(model_OneLessPredictor),
+  AICc(model_clean)
+)
+
+R_squared <- c(
+  summary(model_OneLessPredictor)$adj.r.squared,
+  summary(model_clean)$adj.r.squared
+)
+
+# Create comparison table
+Final_comparison <- data.frame(
+  Model = c("Sqrt-Transformed", "Outliers Removed"),
+  R_Squared = R_squared,
+  AIC = AIC_values,
+  BIC = BIC_values,
+  AICc = AICc_values
+)
+
+# Final results
+print(Final_comparison)
+```
+
+
+### QQ and Residual comparsion
+- Both looks Better
+```{r residual-plots}
+#| label: QQ and Residual comparsion
+#| fig-cap: Residual Plots
+#| echo: false
+p2 <- ggplot(data.frame(Fitted = model_OneLessPredictor$fitted.values, 
+                       Residuals = resid(model_OneLessPredictor)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("Before removing outlier") +
+  theme_minimal()
+
+p3 <- ggplot(data.frame(Fitted = model_clean$fitted.values, 
+                       Residuals = resid(model_clean)), 
+             aes(Fitted, Residuals)) +
+  geom_point(color = "red") +
+  ggtitle("After Removing outlier") +
+  ylim(-6.25, 2.5) +
+  theme_minimal()
+
+p4 = ggplot(data.frame(resid(model_OneLessPredictor)), aes(sample = resid(model_OneLessPredictor))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Q-Q Plot of one less predictor")
+
+p5 = ggplot(data.frame(resid(model_clean)), aes(sample = resid(model_clean))) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ylim(-6.25, 2.5) +
+  ggtitle("Q-Q Plot of After remove outlier")
+
+grid.arrange( p2, p3, p4, p5, ncol = 2)
+```
+\newpage
+
+\appendix
+
+# Appendix
 ```{r}
 library(gridExtra)
 
@@ -412,220 +899,13 @@ p2 <- ggplot(df_clean, aes(x = School_Language, y = fitted_values)) +
   theme_minimal()
 
 p3 <- ggplot_with_abline(df_clean, "Special_Ed_Pct", "Special Ed Pct")
-p4 <- ggplot_with_abline(df_clean, "Low_Income_sqrt", "Low Income Pct")
+p4 <- ggplot_with_abline(df_clean, "Low_Income_Pct", "Low Income Pct")
 
 
 p5 <- ggplot_with_abline(df_clean, "No_Parent_Degree_Pct", "No Parent Degree Pct")
 
 # Arrange plots in a grid
 grid.arrange(p1, p2, p3, p4, p5, ncol = 3, nrow = 2)
-```
-
-```{r}
-par(mfrow = c(1, 3))  # Arrange plots in one row
-
-#df_clean$OSSLT_First_Attempt_PassRate = df_clean$OSSLT_First_Attempt_PassRate +0.001
-summary(df_clean$OSSLT_First_Attempt_PassRate)
-
-model <- lm(OSSLT_First_Attempt_PassRate ~ 
-             School_Type + 
-             School_Language + 
-             Special_Ed_Pct + 
-             Low_Income_Pct + 
-             No_Parent_Degree_Pct, 
-             data = df_clean)
-
-# Residuals vs Fitted
-plot(model$fitted.values, resid(model), main="Residuals vs Fitted", 
-     xlab="Fitted Values", ylab="Residuals", pch=20) 
-
-ggplot(data.frame(resid(model)), aes(sample = resid(model))) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals")
-
-# Histogram of Residuals
-hist(resid(model), main="Histogram of Residuals", 
-     xlab="Residuals", col="gray", border="white")
-par(mfrow = c(1, 1))
-
-summary(df_clean$OSSLT_First_Attempt_PassRate)
-library(car)
-library(MASS)
-boxcox_result <- boxcox(model, plotit = TRUE)  # Plot to find optimal lambda
-lambda <- boxcox_result$x[which.max(boxcox_result$y)]
-lambda
-
-df_clean$OSSLT_Transform = log(df_clean$OSSLT_First_Attempt_PassRate)
-model_transformed <- lm(OSSLT_Transform ~ School_Type + School_Language + 
-                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
-                       data = df_clean)
-df_clean$OSSLT_Sqrt = sqrt(df_clean$OSSLT_First_Attempt_PassRate)
-model_sqrt <- lm(OSSLT_Sqrt ~ School_Type + School_Language + 
-                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
-                       data = df_clean)
-df_clean$OSSLT_Cube = (df_clean$OSSLT_First_Attempt_PassRate)^3
-model_cube <- lm(OSSLT_Cube ~ School_Type + School_Language + 
-                       Special_Ed_Pct + Low_Income_Pct + No_Parent_Degree_Pct, 
-                       data = df_clean)
-
-
-# Q-Q plot for the original model
-p1 = ggplot(data.frame(resid(model)), aes(sample = resid(model))) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals")
-
-# Q-Q plot for the transformed model
-p2 = ggplot(data.frame(resid(model_transformed)), aes(sample = resid(model_transformed))) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(Log)")
-
-p3 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(Sqrt)")
-
-p4 = ggplot(data.frame(resid(model_cube)), aes(sample = resid(model_cube))) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(Cube)")
-
-grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
-
-# summary(model_transformed)
-```
-
-```{r}
-library(gridExtra)
-# Create individual ggplots
-p1 <- ggplot(data.frame(Fitted = model$fitted.values, Residuals = resid(model)), 
-             aes(Fitted, Residuals)) +
-  geom_point(color = "blue") +
-  ggtitle("Original Residuals") +
-  theme_minimal()
-
-p2 <- ggplot(data.frame(Fitted = model_transformed$fitted.values, 
-                       Residuals = resid(model_transformed)), 
-             aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
-  ggtitle("Log-Transformed Residuals") +
-  theme_minimal()
-
-
-p3 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, 
-                       Residuals = resid(model_sqrt)), 
-             aes(Fitted, Residuals)) +
-  geom_point(color = "darkgreen") +
-  ggtitle("Sqrt-Transformed Residuals") +
-  theme_minimal()
-
-p4 <- ggplot(data.frame(Fitted = model_cube$fitted.values, 
-                       Residuals = resid(model_cube)), 
-             aes(Fitted, Residuals)) +
-  geom_point(color = "purple") +
-  ggtitle("cube-Transformed Residuals") +
-  theme_minimal()
-
-
-grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
-
-```
-
-```{R}
-
-AIC_original <- AIC(model)
-AIC_log <- AIC(model_transformed)
-AIC_sqrt <- AIC(model_sqrt)
-AIC_cube <- AIC(model_cube)
-
-
-# Compare AIC values
-aic_comparison <- data.frame(
-  Model = c("Original", "Log-Transformed", "Sqrt-Transformed","Cube"),
-  AIC = c(AIC_original, AIC_log, AIC_sqrt, AIC_cube)
-)
-
-# Print the results
-print(aic_comparison)
-
-install.packages("moments")
-library(moments)
-skewness(df_clean$OSSLT_First_Attempt_PassRate)
-
-#Cannot be used when reponse variable is transformed, cuz scales differ
-summary(model)$adj.r.squared
-summary(model_transformed)$adj.r.squared
-
-```
-
-```{r}
-
-df_clean$Sp_Ed_Transform = (df_clean$Special_Ed_Pct)
-df_clean$Low_Income_Transform = (df_clean$Low_Income_Pct)
-df_clean$No_Edu_Transform = (df_clean$No_Parent_Degree_Pct)
-cor(df_clean[, c("Sp_Ed_Transform", "Low_Income_Transform", "No_Edu_Transform")])
-model_Transformwith_x <- lm(OSSLT_Sqrt ~ School_Type + School_Language + 
-                       Sp_Ed_Transform + Low_Income_Transform + No_Edu_Transform, 
-                       data = df_clean)
-
-plot1 <- ggplot(df_clean, aes(x = Sp_Ed_Transform)) +
-  geom_histogram(fill = "lightgreen", bins = 30) +
-  labs(title = "Special Education Services Transform", x = "Percentage", y = "Count") +
-  theme_minimal()+
-  theme(plot.title = element_text(size = 8, face = "bold"))
-
-plot2 <- ggplot(df_clean, aes(x = Low_Income_Transform)) +
-  geom_histogram(fill = "blue", bins = 30) +
-  labs(title = "Low Income Transform", x = "Percentage", y = "Count") +
-  theme_minimal()+
-  theme(plot.title = element_text(size = 8, face = "bold"))
-
-plot3 <- ggplot(df_clean, aes(x = No_Edu_Transform)) +
-  geom_histogram(fill = "red", bins = 30) +
-  labs(title = " Parent Education Transform", x = "Percentage", y = "Count") +
-  theme_minimal()+
-  theme(plot.title = element_text(size = 8, face = "bold"))
-
-grid.arrange(plot1, plot2, plot3, ncol = 2, nrow = 2)
-
-```
-
-```{R}
-p2 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(sqrt)")
-
-p3 = ggplot(data.frame(resid(model_Transformwith_x)), aes(sample = resid(model_Transformwith_x))) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(sqrt with sqrt X)")
-
-grid.arrange( p2, p3, ncol = 2)
-
-```
-
-``` {R}
-p2 <- ggplot(data.frame(Fitted = model_transformed$fitted.values, 
-                       Residuals = resid(model_transformed)), 
-             aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
-  ggtitle("Log-Transformed only Y Residuals") +
-  theme_minimal()
-
-p3 <- ggplot(data.frame(Fitted = model_Logwith_x$fitted.values, 
-                       Residuals = resid(model_Transformwith_x)), 
-             aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
-  ggtitle("Sqrt -Transformed with x transform Residuals") +
-  theme_minimal()
-
-grid.arrange(p2, p3, ncol = 2)
-
-summary(model_Logwith_x)
-AIC(model_transformed, model_Logwith_x)
 ```
 \newpage
 # References
