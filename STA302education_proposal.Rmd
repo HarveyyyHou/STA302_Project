@@ -34,6 +34,9 @@ library(knitr)
 library(kableExtra)
 library(ggplot2)
 library(gridExtra)
+library(broom)
+library(MuMIn) 
+
 
 ```
 
@@ -54,7 +57,7 @@ The dataset, available on the Ontario Data Catalogue [@OntarioSchoolData], provi
 #| include: false
 #| warning: false
 #| message: false
-data <- read.csv("C:/Users/houju/Desktop/Data_Analysis_SelfLearn/STA302 Part 1 Submission/STA302 Part 1 Submission/STA302_original_dataset.csv")
+data <- read.csv("/Users/zhouxuanle/Desktop/2025winter/STA302/STA302 project 1/STA302 Part 1 Submission/STA302_original_dataset.csv")
 
 ```
 
@@ -149,7 +152,7 @@ The `OSSLT_First_Attempt_PassRate`, the response variable, measures the percenta
 #| tbl-cap: "OSSLT First Attempt Pass Rate Descriptive Statistics"
 #| echo: false
 
-df_clean <- read.csv("C:/Users/houju/Desktop/Data_Analysis_SelfLearn/STA302 Part 1 Submission/STA302 Part 1 Submission/cleaned_data_school.csv")
+df_clean <- read.csv("/Users/zhouxuanle/Desktop/2025winter/STA302/STA302 project 1/STA302 Part 1 Submission/cleaned_data_school.csv")
 
 
 summary_table <- describe(df_clean %>% select(`OSSLT_First_Attempt_PassRate`)) %>%  
@@ -172,7 +175,7 @@ summary_table %>%
   column_spec(1, bold = TRUE, width = "5cm") %>%  
   column_spec(2:min(ncol(summary_table), 5), width = "2cm")
 
-
+summary_table
 ```
 
 
@@ -381,6 +384,7 @@ summary_table %>%
   column_spec(1, bold = TRUE, width = "5cm") %>%  
   column_spec(2:min(ncol(summary_table), 5), width = "2cm")
 
+summary_table
 ```
 
 
@@ -552,7 +556,7 @@ df_clean$Low_Income_Transform = (df_clean$Low_Income_Pct)
 df_clean$No_Edu_Transform = (df_clean$No_Parent_Degree_Pct)
 model_Transformwith_x <- lm(OSSLT_Sqrt ~ School_Type + School_Language + Special_Ed_Pct + Sp_Ed_Transform + Low_Income_Transform + No_Edu_Transform, data = df_clean)
 
-model_OneLessPredictor <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Sp_Ed_Transform + Low_Income_Transform + No_Edu_Transform, data = df_clean)
+model_OneLessPredictor <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Income_Transform + No_Edu_Transform, data = df_clean)
 
 model_drop_No_Add <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Income_Transform + No_Edu_Transform, data = df_clean)
 
@@ -865,6 +869,121 @@ p5 = ggplot(data.frame(resid(model_clean)), aes(sample = resid(model_clean))) +
 
 grid.arrange( p2, p3, p4, p5, ncol = 2)
 ```
+# Final model inference and results
+
+```{r}
+#| label: tbl-final-model-regression-coef
+#| tbl-cap: "Regression Coeﬀicients with 95% Confidence Intervals"
+#| echo: false
+
+model_clean <- update(model_OneLessPredictor,
+                      data = df_clean[-c(211, 385, 102, 118, 225, 484, 533), ])
+
+# Get tidy coefficients
+coef_table <- tidy(model_clean)
+
+#Get confidence intervals
+confint_df <- confint(model_clean) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("term") %>%
+  rename(
+    `Lower 95% CI` = `2.5 %`,
+    `Upper 95% CI` = `97.5 %`
+  )
+
+# Merge coefficients with confidence intervals
+full_table <- left_join(coef_table, confint_df, by = "term")
+
+#Format p-values nicely
+full_table <- full_table %>%
+  mutate(
+    `t value` = formatC(statistic, format = "f", digits = 2),
+    `Pr(>|t|)` = format.pval(p.value, digits = 3, eps = .Machine$double.eps),
+    Estimate = formatC(estimate, format = "f", digits = 4),
+    `Std. Error` = formatC(std.error, format = "f", digits = 4),
+    `Lower 95% CI` = formatC(`Lower 95% CI`, format = "f", digits = 4),
+    `Upper 95% CI` = formatC(`Upper 95% CI`, format = "f", digits = 4)
+  )
+
+full_table <- full_table %>%
+  mutate(term = case_when(
+    term == "(Intercept)" ~ "(Intercept)",
+    term == "School_LanguageFrench" ~ "School Language - French ",
+    term == "Special_Ed_Pct" ~ "% in Special Education",
+    term == "Low_Income_Transform" ~ "% in Low Income",
+    term == "No_Edu_Transform" ~ "% in No Educated Parent ",
+    TRUE ~ term  
+  ))
+
+full_table[, c("term", "Estimate", "Std. Error", "t value", "Pr(>|t|)", "Lower 95% CI", "Upper 95% CI")] %>%
+  kable(
+    col.names = c("Predictor", "Estimate", "Std. Error", "t value", "p-value", "Lower 95% CI", "Upper 95% CI"),
+    caption = "Regression Coefficients with 95% Confidence Intervals",
+    escape = FALSE,
+    booktabs = TRUE,
+    align = "lcccccc"
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position", "threeparttable"), 
+    font_size = 9
+  ) %>%
+  row_spec(0, bold = TRUE)
+```
+
+## Model Interpretation 
+
+The regression results presented in @tbl-final-model-regression-coef provide meaningful insight into how school and family level factors influence OSSLT first attempt success rates in Ontario. Notably, the language of instruction emerges as a significant predictor: schools offering instruction in French are associated with higher OSSLT performance, holding all other variables in the model constant. Specifically, French language schools are predicted to have a 0.31 unit increase in the square root of the OSSLT first attempt pass rate compared to English language schools. The 95% confidence interval for this estimate ranges from 0.2061 to 0.4196, indicating a consistently positive effect that is statistically significant. 
+
+In contrast, three key indicators of socioeconomic and educational disadvantage are all significantly associated with lower OSSLT performance: the percentage of students receiving special education services, the percentage of school aged children living in low income households, and the percentage of students whose parents have no degree, diploma, or certificate. 
+For each one percentage point increase in students receiving special education, there is an estimated 0.039 unit decrease in the square root of the OSSLT pass rate, with a 95% confidence interval ranging from -0.0420 to -0.0360. Likewise, each additional percentage point of students from low income households is associated with a 0.0159 unit decrease, with the confidence interval ranging from -0.0212 to -0.0105. Finally, each percentage point increase in students whose parents lack post secondary education corresponds to a 0.0269 unit decrease in the transformed OSSLT outcome, with a confidence interval between -0.0341 and -0.0197. The narrow confidence intervals for all predictors suggest that the estimated effects are both precise and robust.
+
+## Comparing with Literature
+
+The findings from our final regression model align closely with much of the existing literature on factors influencing student literacy outcomes. Consistent with @zhang2020family, we found that both family income and parental education level are significant predictors of OSSLT success: schools with higher percentages of students from low-income households and students whose parents lack post-secondary education showed notably lower OSSLT pass rates. This supports the broader claim that socioeconomic status plays a critical role in shaping educational achievement. Similarly, our results reinforce the observations of @vaughn2014intensive, as schools with higher proportions of students receiving special education services were significantly associated with lower OSSLT outcomes, likely due to the academic challenges these students face, even with accommodations.
+
+However, our results diverge from the expectation presented by @bernhofer2022effect, who suggest students perform better when taught in their first language. In our analysis, schools offering instruction in French had significantly higher OSSLT performance, even though the OSSLT is administered in English. This suggests that French language instruction may be associated with school environments or educational practices that contribute positively to student literacy, despite the language difference. It may also reflect broader institutional or cultural differences between French and English schools in Ontario that warrant further exploration, such as school funding models, curriculum focus, or community engagement.
+
+Our hypothesis regarding school type was not supported in the final model. School type, which identifies whether a school is Catholic or Public, was excluded due to a lack of statistical significance as discussed above. This outcome contrasts with the findings of @cheema2024difference, who reported that private schools tend to outperform public schools in literacy achievement. While we expected Catholic schools to demonstrate higher OSSLT performance due to structured curricula or the potential influence of religious education resources, our model did not find a meaningful difference once other variables were accounted for. This suggests that variation in OSSLT performance across schools is more strongly explained by socioeconomic and instructional factors than by school type alone. 
+
+
+```{r}
+#| label: tbl-final-model-fit
+#| tbl-cap: "Model Fit Statistics"
+#| echo: false
+
+model_metrics <- data.frame(
+  Metric = c(
+    "R-squared",
+    "Adjusted R-squared",
+    "AIC",
+    "BIC",
+    "AICc",
+    "Residual Std. Error"
+  ),
+  Value = c(
+    summary(model_clean)$r.squared,
+    summary(model_clean)$adj.r.squared,
+    AIC(model_clean),
+    BIC(model_clean),
+    AICc(model_clean),
+    summary(model_clean)$sigma
+  )
+)
+
+# Display table
+kable(model_metrics, digits = 4)
+```
+
+## Model Performance Assessment
+The performance of the final multiple linear regression model, as shown in @tbl-final-model-fit, can be evaluated using several statistical metrics that assess both goodness of fit and model parsimony. One of the most interpretable metrics is the R-squared value, which in this model is 0.5607. This indicates that approximately 56.1% of the variation in the square root of the OSSLT first-attempt pass rate is explained by the predictors included in the model. In the context of educational research, where student performance can be influenced by many unmeasured social, psychological, and institutional factors, an R-squared value above 0.5 is considered relatively strong. It suggests that the model captures a substantial portion of the meaningful variance across schools in Ontario.
+
+The Adjusted R-squared value, which accounts for the number of predictors in the model, is 0.5583. While slightly lower than the unadjusted R-squared, this is expected and confirms that the included predictors contribute meaningfully to explaining the outcome without overfitting the data. The minimal difference between the two values suggests that the model achieves a good balance between explanatory power and complexity. This strengthens confidence that the model's performance is not artificially inflated by the number of predictors used.
+
+Beyond explanatory power, model selection criteria such as the Akaike Information Criterion (AIC), the corrected AIC (AICc), and the Bayesian Information Criterion (BIC) provide important insights into model efficiency and generalizability. Both AIC and AICc are measures of model fit that penalize complexity, with lower values indicating better-fitting models. In our model, the AIC is 914.25 and the AICc is 914.36. 
+
+The distinction between AIC and AICc lies in their intended use: AICc is a bias-corrected version of AIC that is particularly useful when the sample size is small or when the number of estimated parameters is a moderate to large fraction of the sample size. According to the rule of thumb provided by @burnham2004multimodel, AICc is preferred over AIC when the sample size $n \leq 40(p + 2)$ where p is the number of predictors. Based on this criterion, our dataset includes around eight hundred observations and only four predictors, which indicates that AIC is a more suitable measure for evaluating our model.
+
+
 \newpage
 
 \appendix
