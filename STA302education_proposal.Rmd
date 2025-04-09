@@ -36,7 +36,7 @@ library(ggplot2)
 library(gridExtra)
 library(broom)
 library(MuMIn) 
-
+library(leaps)
 
 ```
 
@@ -57,7 +57,7 @@ The dataset, available on the Ontario Data Catalogue [@OntarioSchoolData], provi
 #| include: false
 #| warning: false
 #| message: false
-data <- read.csv("/Users/zhouxuanle/Desktop/2025winter/STA302/STA302 project 1/STA302 Part 1 Submission/STA302_original_dataset.csv")
+data <- read.csv("C:/Users/houju/Desktop/Data_Analysis_SelfLearn/STA302 Part 1 Submission/STA302 Part 1 Submission/STA302_original_dataset.csv")
 
 ```
 
@@ -152,7 +152,7 @@ The `OSSLT_First_Attempt_PassRate`, the response variable, measures the percenta
 #| tbl-cap: "OSSLT First Attempt Pass Rate Descriptive Statistics"
 #| echo: false
 
-df_clean <- read.csv("/Users/zhouxuanle/Desktop/2025winter/STA302/STA302 project 1/STA302 Part 1 Submission/cleaned_data_school.csv")
+df_clean <- read.csv("C:/Users/houju/Desktop/Data_Analysis_SelfLearn/STA302 Part 1 Submission/STA302 Part 1 Submission/cleaned_data_school.csv")
 
 
 summary_table <- describe(df_clean %>% select(`OSSLT_First_Attempt_PassRate`)) %>%  
@@ -387,12 +387,11 @@ summary_table %>%
 summary_table
 ```
 
-
-### Obtain Box Cox Suggestion
+# Model Selection
 ```{r}
-#| label: Box Cox
-#| tbl-cap: "Box Cox"
-#| echo: false
+#| include: false
+#| warning: false
+#| message: false
 df_clean$OSSLT_First_Attempt_PassRate = df_clean$OSSLT_First_Attempt_PassRate +0.001
 
 model <- lm(OSSLT_First_Attempt_PassRate ~ 
@@ -408,8 +407,9 @@ boxcox_result <- boxcox(model, plotit = FALSE)  # Plot to find optimal
 lambda <- boxcox_result$x[which.max(boxcox_result$y)]
 lambda
 ```
-### Response Variable Transformation Preview with QQ
-- We got 2 as Box Cox lambda, Therefore we Try Y^2 Transformation, we also tried many other transformations such as 1/Y, and decided to show Log and Square Root and they are the most improved Models.
+### Response Variable Transformation and Assumption Comparison
+- After fitting our original model, we consider some transformations. The first method is Box Cox, which uses maximum likelihood to choose transformation so the residuals are approximately normally distributed. We found 2 as Box Cox lambda, suggesting a squared transformation. Therefore we Try Y^2 Transformation, we also tried many other transformations such as 1/Y, and decided to display log and square root as they improved from original model.
+- Normality: The Q-Q plot of residuals suggest residuals are approximately normal for square root and log, though slight deviations exist at the left tail. Note that the scale for the Square root graph is a lot bigger, minimal deviation indicates violation.
 ```{r residual-plots}
 #| label: Response Variable Transformation Preview with QQ
 #| fig-cap: Residual Plots
@@ -456,7 +456,7 @@ grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
 # summary(model_transformed)
 ```
 ### Response Variable Transformation Preview with Residuals
-- Square root looks the best for residual plot
+- Linearity & Homoscedasticity: The Square Root residuals vs. fitted plot is ideal, as the Y scale range is a lot smaller than other transformations and there is no clear patterns. This suggest linearity. Slight heteroscedasticity is observed around x=-10.
 ```{r residual-plots}
 #| label: Response Variable Transformation Preview with Residuals
 #| fig-cap: Residual Plots
@@ -495,8 +495,8 @@ p4 <- ggplot(data.frame(Fitted = model_square$fitted.values,
 grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
 
 ```
-### Response Variable Transformation Decision
-- We eliminate Square since the model performs worse in every aspect. We need to choose one between Log and Square Root Transformation that both improve from the original model. We ended up with Square root since R squared for square root is significantly higher to Log. The difference in AIC, BIC and AICc is not significant enough to replace R^2.
+### Response Variable Transformation Metrics and Decision
+- We eliminate Square since the model performs worse in every aspect. Square Root and Log Transformation both rapidly improve from the original model based on AIC, BIC and AICc. However, R^2 dropped by approximately 34% compared to original for Log, indicating log model's ability to explain variance significantly decreased. In contrast, Square Root Model R^2 only decreased by less than 2% for better Normality, linearity and Homoscedasticity. The difference in AIC, BIC and AICc between Log and Square Root is not significant enough to replace R^2. Therefore, we apply square root transformation on our response variable.
 ```{R}
 #| label: Y Transformation Decision
 #| tbl-cap: "R^2, AIC, BIC, AICc"
@@ -536,15 +536,86 @@ print(ytransform_comparison)
 ```
 
 ### Y transformed model summary, VIF and Confidence Interval
-- Confidence Interval contains 0 and p value >0.05 for School_Type, Suggest dropping this predictor.
+- The confidence interval contains 0 and p value >0.05 for School_Type, suggest dropping this predictor.
+- Variance Inflation Factor for all are smaller than 5, indicating no predictor have issues with multicollinearity.
 ```{r}
 #| label: VIF, Confidence Interval and Summary
 #| tbl-cap: "VIF, Confidence Interval and Summary"
 #| echo: false
-summary(model_sqrt)
-vif_values <- vif(model_sqrt)
-print(vif_values)
-confint(model_sqrt)
+# Tidy model output
+coef_table <- tidy(model_sqrt)
+
+# Confidence intervals
+confint_df <- confint(model_sqrt) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("term") %>%
+  rename(`Lower 95% CI` = `2.5 %`, `Upper 95% CI` = `97.5 %`)
+
+# VIFs from model
+raw_vifs <- vif(model_sqrt)
+
+# Expand VIFs to match dummy-coded names
+expanded_vif <- coef_table %>%
+  dplyr::select(term) %>%
+  dplyr::mutate(
+    base_var = dplyr::case_when(
+      grepl("^School_Type", term) ~ "School_Type",
+      grepl("^School_Language", term) ~ "School_Language",
+      term == "Special_Ed_Pct" ~ "Special_Ed_Pct",
+      term == "Low_Income_Pct" ~ "Low_Income_Pct",
+      term == "No_Parent_Degree_Pct" ~ "No_Parent_Degree_Pct",
+      TRUE ~ NA_character_
+    ),
+    VIF = raw_vifs[base_var]
+  ) %>%
+  dplyr::select(term, VIF)
+
+# Merge all
+full_table <- coef_table %>%
+  left_join(confint_df, by = "term") %>%
+  left_join(expanded_vif, by = "term")
+
+# Format values
+full_table <- full_table %>%
+  mutate(
+    `t value` = formatC(statistic, format = "f", digits = 2),
+    `Pr(>|t|)` = format.pval(p.value, digits = 3, eps = .Machine$double.eps),
+    Estimate = formatC(estimate, format = "f", digits = 4),
+    `Std. Error` = formatC(std.error, format = "f", digits = 4),
+    `Lower 95% CI` = formatC(`Lower 95% CI`, format = "f", digits = 4),
+    `Upper 95% CI` = formatC(`Upper 95% CI`, format = "f", digits = 4),
+    VIF = ifelse(is.na(VIF), "", formatC(VIF, format = "f", digits = 2))
+  )
+
+# Rename terms for final display
+full_table <- full_table %>%
+  mutate(term = case_when(
+    term == "(Intercept)" ~ "(Intercept)",
+    term == "School_TypePublic" ~ "School Type - Public",
+    term == "School_LanguageFrench" ~ "School Language - French",
+    term == "Special_Ed_Pct" ~ "% in Special Education",
+    term == "Low_Income_Pct" ~ "% in Low Income",
+    term == "No_Parent_Degree_Pct" ~ "% in No Educated Parent",
+    TRUE ~ term
+  ))
+
+# Display final table
+full_table[, c("term", "Estimate", "Std. Error", "t value", "Pr(>|t|)",
+               "Lower 95% CI", "Upper 95% CI", "VIF")] %>%
+  kable(
+    col.names = c("Predictor", "Estimate", "Std. Error", "t value", "p-value",
+                  "Lower 95% CI", "Upper 95% CI", "VIF"),
+    caption = "Regression Coefficients with 95% Confidence Intervals and VIF",
+    escape = FALSE,
+    booktabs = TRUE,
+    align = "lccccccc"
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position", "threeparttable"),
+    font_size = 9
+  ) %>%
+  row_spec(0, bold = TRUE)
+
 ```
 
 ```{r}
@@ -556,12 +627,13 @@ df_clean$Low_Income_Transform = (df_clean$Low_Income_Pct)
 df_clean$No_Edu_Transform = (df_clean$No_Parent_Degree_Pct)
 model_Transformwith_x <- lm(OSSLT_Sqrt ~ School_Type + School_Language + Special_Ed_Pct + Sp_Ed_Transform + Low_Income_Transform + No_Edu_Transform, data = df_clean)
 
-model_OneLessPredictor <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Income_Transform + No_Edu_Transform, data = df_clean)
+model_OneLessPredictor <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Income_Transform + No_Edu_Transform + Sp_Ed_Transform, data = df_clean)
 
 model_drop_No_Add <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Income_Transform + No_Edu_Transform, data = df_clean)
 
 ```
-### X Transformation QQ Preview
+### X Transformation Assumption Preview
+- Other than dropping School Type, we also consider X transformation. After testing different combinations of X transformations, we found that adding a squared special education term slightly increase model performance. Therefore we compare four models: Original with Sqrt(Y), remove school type, add squared special education, and both remove and add. All X transformations models shows similar plots to the original Square Root(y) model plot. 
 ```{R}
 #| label: QQ
 #| tbl-cap: "QQ of all possible X Transformation"
@@ -569,28 +641,31 @@ model_drop_No_Add <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Inco
 p2 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(sqrt)")
+  ggtitle("Q-Q Plot of Residuals(sqrt)") +
+  theme(plot.title = element_text(size = 10))
 
 p3 = ggplot(data.frame(resid(model_Transformwith_x)), aes(sample = resid(model_Transformwith_x))) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("With Polynomial Term On Spec EDU")
+  ggtitle("Add Squared Special EDU") +
+  theme(plot.title = element_text(size = 10))
 
 p4 = ggplot(data.frame(resid(model_OneLessPredictor)), aes(sample = resid(model_OneLessPredictor))) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Removing School Type with extra Term")
+  ggtitle("Drop School Type, Add Squared Spec EDU") +
+  theme(plot.title = element_text(size = 10))
 
 p5 = ggplot(data.frame(resid(model_drop_No_Add)), aes(sample = resid(model_drop_No_Add))) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Removing School Type")
+  ggtitle("Drop School Type") +
+  theme(plot.title = element_text(size = 10))
 
 grid.arrange( p2, p3, p4, p5, ncol = 2)
 
 ```
 
-### X Transformation Residual Plots
 ```{r residual-plots}
 #| label: X Transformation Residual Plots
 #| fig-cap: Residual Plots
@@ -626,8 +701,10 @@ p5 <- ggplot(data.frame(Fitted = model_drop_No_Add$fitted.values,
 grid.arrange(p2, p3, p4, p5, ncol = 2)
 ```
 
-### Predictor Transformation Decision
-- We decide to choose Model 3: X Transform with one less Predictor, since the R^2, AIC, BIC, AICc improved from the original sqrt-Transformed. Model 2 is slightly better but it contains an extra predictor.
+### Predictor Transformation Metrics and Decision
+-  R^2, AIC, BIC, AICc and RSS from anova all slightly improved from models that has the Squared Special Education predictor. However, the improvement is not significant enough (large enough) to add a new predictor and complicate the model. 
+- Between Original and removing School Type, we decide to drop school type, since all metrics does not differ by much, indicating that this predictor has minimal impact on the model, or no relationships.
+- Finally, we can conclude the final model with 4 Predictors: School Language, Special Education Percentage.
 ```{R}
 #| label: Predictor Transformation Decision
 #| tbl-cap: "Predictor Transformation Decision"
@@ -677,29 +754,77 @@ xtransform_comparison <- data.frame(
 print(xtransform_comparison)
 ```
 
-### Anova Table for X Transformation
-- Finally, we can conclude the final model with 5 Predictors: School Language, Special Education Percentage, Special Education Percentage Squared, Lower Income background and Parents with no Education. Because RSS improved.
 ```{R}
 #| label: Anova Table for X Transformation
 #| tbl-cap: "Anova Table for X Transformation"
 #| echo: false
-#summary(model_sqrt)
-#summary(model_Transformwith_x)
-#summary(model_OneLessPredictor)
-anova(model_Transformwith_x, model_sqrt)
-anova(model_OneLessPredictor, model_sqrt)
-anova(model_drop_No_Add, model_sqrt)
+PureX_Transform = anova(model_Transformwith_x, model_sqrt)
+X_Transform_with_less_Predictor = anova(model_OneLessPredictor, model_sqrt)
+Less_Predictor = anova(model_drop_No_Add, model_sqrt)
+
+# Extract RSS and p-values
+results <- data.frame(
+  Comparison = c(
+    "Special Ed Squared vs. Original",
+    "Reference: Original Model",
+    "No School_Type & X-Trans vs. Full",
+    "No School_Type vs. Full"
+  ),
+  RSS_Model1 = c(
+    PureX_Transform$RSS[1],
+    NA,
+    X_Transform_with_less_Predictor$RSS[1],
+    Less_Predictor$RSS[1]
+  ),
+  RSS_Model2 = c(
+    PureX_Transform$RSS[2],
+    PureX_Transform$RSS[2],  # Original model RSS (reference)
+    X_Transform_with_less_Predictor$RSS[2],
+    Less_Predictor$RSS[2]
+  ),
+  p_value = c(
+    PureX_Transform$`Pr(>F)`[2],
+    NA,
+    NA,  # Df=0, no p-value
+    Less_Predictor$`Pr(>F)`[2]
+  )
+)
+
+# Format p-values for significance stars
+results$p_value <- ifelse(
+  is.na(results$p_value), 
+  "", 
+  ifelse(
+    results$p_value < 0.001, 
+    sprintf("%.2e ***", results$p_value),
+    ifelse(
+      results$p_value < 0.01, 
+      sprintf("%.4f **", results$p_value),
+      ifelse(
+        results$p_value < 0.05, 
+        sprintf("%.4f *", results$p_value),
+        sprintf("%.4f", results$p_value)
+      )
+    )
+  )
+)
+
+# Print the clean table
+print(results)
+
+# Print the combined table
+# print(combined_anova)
 ```
 
 ### Outlier Detection and Removal
-- 211,385,102,118,225,484,533. These columns appear under several different tests, so we tried to fit the model after removing these.
+- To detect outliers, influential and leverage points. We tested observation for standardized and studentized residual for outliers; hat for leverage points; DFFITS, DFBETAS and Cook's Distance for influencial points.
+- These columns (211,385,102,118,225,484,533) appear under several different tests, so we try to fit the model after removing these.
 ```{R}
-#| label: Outlier Detection and Removal
-#| tbl-cap: "Outlier Detection and Removal"
-#| echo: false
+#| include: false
+#| warning: false
+#| message: false
 # Fit your model
-# model_OneLessPredictor
-model <- model_OneLessPredictor
+model <- model_drop_No_Add
 
 # ----------------------------
 # 1. Residual Diagnostics
@@ -777,47 +902,76 @@ plot(dfbetas_val[, most_affected_pred], pch = 20,
      ylab = "DFBETAS")
 abline(h = c(-dfbetas_threshold, dfbetas_threshold), col = "red", lty = 2)
 ```
-- Cleaned Model Summary(Without outliers) and Confidence Interval
-```{R}
-#| label: Summary
-#| tbl-cap: "Cleaned Model Summary(Without outliers) and Confidence Interval"
+```{r}
+#| label: Outlier Detection and Removal
+#| tbl-cap: "Outlier Detection and Removal"
 #| echo: false
-#df_clean[c(211, 385), ] 
-model_clean <- update(model_OneLessPredictor, 
-                     data = df_clean[-c(211, 385, 102, 118, 225, 484, 533), ])
-summary(model_clean)
-confint(model_clean)
-#summary(model_OneLessPredictor)
+# Dropped outliers
+dropped_ids <- c(118, 211, 225, 383, 385, 486)
+
+# Categories they appear in
+outlier_info <- data.frame(
+  ID = dropped_ids,
+  `Standardized Residual` = dropped_ids %in% c(211),
+  `Studentized Residual` = dropped_ids %in% c(118, 211, 225, 383, 385, 486),
+  `High Leverage (Hat > 0.016)` = dropped_ids %in% c(118, 211, 225, 383, 385),
+  `Influential (Cook's D > 0.005)` = dropped_ids %in% c(118, 211, 225, 383, 385, 486),
+  `High DFFITS` = dropped_ids %in% c(118, 211, 225, 383, 385, 486),
+  `High DFBETAS` = dropped_ids %in% c(118, 211, 225, 383, 385, 486)
+)
+
+# Convert logical TRUE/FALSE to ✔ or ""
+outlier_table <- outlier_info %>%
+  mutate(across(-ID, ~ ifelse(.x, "✔", "")))
+
+# Show table using kable
+
+outlier_table %>%
+  kable(
+    caption = "Significant Outliers Found in multiple Categories",
+    col.names = c("Observation ID", "Standardized Residual", "Studentized Residual", 
+                  "High Leverage", "Influential (Cook's D)", "High DFFITS", "High DFBETAS"),
+    align = "c",
+    escape = FALSE,
+    booktabs = TRUE
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position", "threeparttable"),
+    full_width = FALSE,
+    font_size = 10
+  ) %>%
+  row_spec(0, bold = TRUE)
+
 ```
 
 ### Assess Model Performance after removing outlier
-- Hooray, AIC, BIC, AICc, R^2 all improved significant enough to conclude the removing outlier process.
+- AIC, BIC, AICc, R^2 all improved after removing outliers, so we conclude the removing outlier process.
 ```{R}
 #| label: Assess Model Performance after removing outlier
 #| tbl-cap: "Assess Model Performance after removing outlier"
 #| echo: false
-#Anova, AIC, BIC ...
-#install.packages("leaps")
-library(leaps)
-# Extract AIC values (second element of extractAIC() output)
+
+model_clean <- update(model_drop_No_Add,
+                      data = df_clean[-c(118, 211, 225, 383, 385, 486), ])
+
 AIC_values <- c(
-  extractAIC(model_OneLessPredictor)[2],
+  extractAIC(model_drop_No_Add)[2],
   extractAIC(model_clean)[2]
 )
 
 # Extract other metrics
 BIC_values <- c(
-  BIC(model_OneLessPredictor),
+  BIC(model_drop_No_Add),
   BIC(model_clean)
 )
 
 AICc_values <- c(
-  AICc(model_OneLessPredictor),
+  AICc(model_drop_No_Add),
   AICc(model_clean)
 )
 
 R_squared <- c(
-  summary(model_OneLessPredictor)$adj.r.squared,
+  summary(model_drop_No_Add)$adj.r.squared,
   summary(model_clean)$adj.r.squared
 )
 
@@ -835,14 +989,14 @@ print(Final_comparison)
 ```
 
 
-### QQ and Residual comparsion
-- Both looks Better
+### QQ and Residual final comparsion
+- Both graphs improved with no outliers near the bound of scales.
 ```{r residual-plots}
 #| label: QQ and Residual comparsion
 #| fig-cap: Residual Plots
 #| echo: false
-p2 <- ggplot(data.frame(Fitted = model_OneLessPredictor$fitted.values, 
-                       Residuals = resid(model_OneLessPredictor)), 
+p2 <- ggplot(data.frame(Fitted = model_drop_No_Add$fitted.values, 
+                       Residuals = resid(model_drop_No_Add)), 
              aes(Fitted, Residuals)) +
   geom_point(color = "red") +
   ggtitle("Before removing outlier") +
@@ -856,7 +1010,7 @@ p3 <- ggplot(data.frame(Fitted = model_clean$fitted.values,
   ylim(-6.25, 2.5) +
   theme_minimal()
 
-p4 = ggplot(data.frame(resid(model_OneLessPredictor)), aes(sample = resid(model_OneLessPredictor))) +
+p4 = ggplot(data.frame(resid(model_drop_No_Add)), aes(sample = resid(model_drop_No_Add))) +
   stat_qq() +
   stat_qq_line(color = "red") +
   ggtitle("Q-Q Plot of one less predictor")
@@ -875,9 +1029,6 @@ grid.arrange( p2, p3, p4, p5, ncol = 2)
 #| label: tbl-final-model-regression-coef
 #| tbl-cap: "Regression Coeﬀicients with 95% Confidence Intervals"
 #| echo: false
-
-model_clean <- update(model_OneLessPredictor,
-                      data = df_clean[-c(211, 385, 102, 118, 225, 484, 533), ])
 
 # Get tidy coefficients
 coef_table <- tidy(model_clean)
@@ -932,10 +1083,10 @@ full_table[, c("term", "Estimate", "Std. Error", "t value", "Pr(>|t|)", "Lower 9
 
 ## Model Interpretation 
 
-The regression results presented in @tbl-final-model-regression-coef provide meaningful insight into how school and family level factors influence OSSLT first attempt success rates in Ontario. Notably, the language of instruction emerges as a significant predictor: schools offering instruction in French are associated with higher OSSLT performance, holding all other variables in the model constant. Specifically, French language schools are predicted to have a 0.31 unit increase in the square root of the OSSLT first attempt pass rate compared to English language schools. The 95% confidence interval for this estimate ranges from 0.2061 to 0.4196, indicating a consistently positive effect that is statistically significant. 
+The regression results presented in @tbl-final-model-regression-coef provide meaningful insight into how school and family level factors influence OSSLT first attempt success rates in Ontario. Notably, the language of instruction emerges as a significant predictor: schools offering instruction in French are associated with higher OSSLT performance, holding all other variables in the model constant. Specifically, French language schools are predicted to have a 0.3272 unit increase in the square root of the OSSLT first attempt pass rate compared to English language schools. The 95% confidence interval for this estimate ranges from 0.2221 to 0.4323, indicating a consistently positive effect that is statistically significant. 
 
 In contrast, three key indicators of socioeconomic and educational disadvantage are all significantly associated with lower OSSLT performance: the percentage of students receiving special education services, the percentage of school aged children living in low income households, and the percentage of students whose parents have no degree, diploma, or certificate. 
-For each one percentage point increase in students receiving special education, there is an estimated 0.039 unit decrease in the square root of the OSSLT pass rate, with a 95% confidence interval ranging from -0.0420 to -0.0360. Likewise, each additional percentage point of students from low income households is associated with a 0.0159 unit decrease, with the confidence interval ranging from -0.0212 to -0.0105. Finally, each percentage point increase in students whose parents lack post secondary education corresponds to a 0.0269 unit decrease in the transformed OSSLT outcome, with a confidence interval between -0.0341 and -0.0197. The narrow confidence intervals for all predictors suggest that the estimated effects are both precise and robust.
+For each one percentage point increase in students receiving special education, there is an estimated 0.0369 unit decrease in the square root of the OSSLT pass rate, with a 95% confidence interval ranging from -0.0399 to -0.0338. Likewise, each additional percentage point of students from low income households is associated with a 0.016 unit decrease, with the confidence interval ranging from -0.0213 to -0.0107. Finally, each percentage point increase in students whose parents lack post secondary education corresponds to a 0.0278 unit decrease in the transformed OSSLT outcome, with a confidence interval between -0.0349 and -0.0207. The narrow confidence intervals for all predictors suggest that the estimated effects are both precise and robust.
 
 ## Comparing with Literature
 
@@ -963,7 +1114,7 @@ model_metrics <- data.frame(
   Value = c(
     summary(model_clean)$r.squared,
     summary(model_clean)$adj.r.squared,
-    AIC(model_clean),
+    extractAIC(model_clean)[2],
     BIC(model_clean),
     AICc(model_clean),
     summary(model_clean)$sigma
@@ -975,11 +1126,11 @@ kable(model_metrics, digits = 4)
 ```
 
 ## Model Performance Assessment
-The performance of the final multiple linear regression model, as shown in @tbl-final-model-fit, can be evaluated using several statistical metrics that assess both goodness of fit and model parsimony. One of the most interpretable metrics is the R-squared value, which in this model is 0.5607. This indicates that approximately 56.1% of the variation in the square root of the OSSLT first-attempt pass rate is explained by the predictors included in the model. In the context of educational research, where student performance can be influenced by many unmeasured social, psychological, and institutional factors, an R-squared value above 0.5 is considered relatively strong. It suggests that the model captures a substantial portion of the meaningful variance across schools in Ontario.
+The performance of the final multiple linear regression model, as shown in @tbl-final-model-fit, can be evaluated using several statistical metrics that assess both goodness of fit and model parsimony. One of the most interpretable metrics is the R-squared value, which in this model is 0.5429. This indicates that approximately 54.3% of the variation in the square root of the OSSLT first-attempt pass rate is explained by the predictors included in the model. In the context of educational research, where student performance can be influenced by many unmeasured social, psychological, and institutional factors, an R-squared value above 0.5 is considered relatively strong. It suggests that the model captures a substantial portion of the meaningful variance across schools in Ontario.
 
-The Adjusted R-squared value, which accounts for the number of predictors in the model, is 0.5583. While slightly lower than the unadjusted R-squared, this is expected and confirms that the included predictors contribute meaningfully to explaining the outcome without overfitting the data. The minimal difference between the two values suggests that the model achieves a good balance between explanatory power and complexity. This strengthens confidence that the model's performance is not artificially inflated by the number of predictors used.
+The Adjusted R-squared value, which accounts for the number of predictors in the model, is 0.5404. While slightly lower than the unadjusted R-squared, this is expected and confirms that the included predictors contribute meaningfully to explaining the outcome without overfitting the data. The minimal difference between the two values suggests that the model achieves a good balance between explanatory power and complexity. This strengthens confidence that the model's performance is not artificially inflated by the number of predictors used.
 
-Beyond explanatory power, model selection criteria such as the Akaike Information Criterion (AIC), the corrected AIC (AICc), and the Bayesian Information Criterion (BIC) provide important insights into model efficiency and generalizability. Both AIC and AICc are measures of model fit that penalize complexity, with lower values indicating better-fitting models. In our model, the AIC is 914.25 and the AICc is 914.36. 
+Beyond explanatory power, model selection criteria such as the Akaike Information Criterion (AIC), the corrected AIC (AICc), and the Bayesian Information Criterion (BIC) provide important insights into model efficiency and generalizability. Both AIC and AICc are measures of model fit that penalize complexity, with lower values indicating better-fitting models. In our model, the AIC is -1174.5494 and the AICc is 902.0548. 
 
 The distinction between AIC and AICc lies in their intended use: AICc is a bias-corrected version of AIC that is particularly useful when the sample size is small or when the number of estimated parameters is a moderate to large fraction of the sample size. According to the rule of thumb provided by @burnham2004multimodel, AICc is preferred over AIC when the sample size $n \leq 40(p + 2)$ where p is the number of predictors. Based on this criterion, our dataset includes around eight hundred observations and only four predictors, which indicates that AIC is a more suitable measure for evaluating our model.
 
