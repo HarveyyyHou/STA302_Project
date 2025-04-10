@@ -21,6 +21,7 @@ bibliography: references.bib
 # install.packages("knitr")
 # install.packages("kableExtra")
 ## install.packages("readxl") 
+#install.packages("car")
 ```
 
 ```{r}
@@ -37,6 +38,7 @@ library(gridExtra)
 library(broom)
 library(MuMIn) 
 library(leaps)
+library(car)
 
 ```
 
@@ -57,7 +59,7 @@ The dataset, available on the Ontario Data Catalogue [@OntarioSchoolData], provi
 #| include: false
 #| warning: false
 #| message: false
-data <- read.csv("C:/Users/houju/Desktop/Data_Analysis_SelfLearn/STA302 Part 1 Submission/STA302 Part 1 Submission/STA302_original_dataset.csv")
+data <- read.csv("/Users/zhouxuanle/Desktop/STA302_Project/STA302_original_dataset.csv")
 
 ```
 
@@ -152,7 +154,7 @@ The `OSSLT_First_Attempt_PassRate`, the response variable, measures the percenta
 #| tbl-cap: "OSSLT First Attempt Pass Rate Descriptive Statistics"
 #| echo: false
 
-df_clean <- read.csv("C:/Users/houju/Desktop/Data_Analysis_SelfLearn/STA302 Part 1 Submission/STA302 Part 1 Submission/cleaned_data_school.csv")
+df_clean <- read.csv("/Users/zhouxuanle/Desktop/STA302_Project/cleaned_data_school.csv")
 
 
 summary_table <- describe(df_clean %>% select(`OSSLT_First_Attempt_PassRate`)) %>%  
@@ -175,7 +177,6 @@ summary_table %>%
   column_spec(1, bold = TRUE, width = "5cm") %>%  
   column_spec(2:min(ncol(summary_table), 5), width = "2cm")
 
-summary_table
 ```
 
 
@@ -236,22 +237,19 @@ The percentage of students whose parents lack post-secondary credentials average
 
 # Preliminary results
 
-
 ```{r}
 #| label: table-regression
-#| fig-cap: Regression Results
+#| tbl-cap: Regression Preliminary Results
 #| echo: false
-#install.packages("car")
-library(car)
 
 # Fit the linear model
 model <- lm(OSSLT_First_Attempt_PassRate ~ 
-             School_Type + 
-             School_Language + 
-             Special_Ed_Pct + 
-             Low_Income_Pct + 
-             No_Parent_Degree_Pct, 
-             data = df_clean)
+              School_Type + 
+              School_Language + 
+              Special_Ed_Pct + 
+              Low_Income_Pct + 
+              No_Parent_Degree_Pct,
+            data = df_clean)
 
 # Create a summary table
 summary_df <- data.frame(
@@ -261,8 +259,8 @@ summary_df <- data.frame(
   p_Value = summary(model)$coefficients[, "Pr(>|t|)"]
 )
 
-# Display the table
-print(summary_df)
+# Display the table using kable
+kable(summary_df, digits = 3)
 
 ```
 
@@ -287,11 +285,14 @@ $$
 
 
 ### Assumption Check
+
+
 ```{r residual-plots}
 #| label: plot-residuals
 #| fig-cap: Residual Plots
 #| echo: false
-plot.new
+#| fig-width: 6
+#| fig-height: 3
 par(mfrow = c(1, 3))  # Arrange plots in one row
 
 # Residuals vs Fitted
@@ -317,7 +318,6 @@ hist(resid(model), main="Histogram of Residuals",
 
 3. **Independence:** 
   No evident pattern in the residual plot suggests residuals are independent.
-
 
 ## Model Interpretation & Discussion
 
@@ -355,7 +355,6 @@ Our findings align with prior research while offering insights specific to Ontar
 #| echo: false
 
 
-
 # Create the summary table using the renamed columns
 summary_table <- describe(df_clean %>% 
   select(School_Type, 
@@ -382,10 +381,11 @@ summary_table %>%
   column_spec(1, bold = TRUE, width = "5cm") %>%  
   column_spec(2:min(ncol(summary_table), 5), width = "2cm")
 
-summary_table
 ```
 
 # Model Selection
+
+
 ```{r}
 #| include: false
 #| warning: false
@@ -405,13 +405,14 @@ boxcox_result <- boxcox(model, plotit = FALSE)  # Plot to find optimal
 lambda <- boxcox_result$x[which.max(boxcox_result$y)]
 lambda
 ```
-### Response Variable Transformation and Assumption Comparison
-- After fitting our original model, we consider some transformations. The first method is Box Cox, which uses maximum likelihood to choose transformation so the residuals are approximately normally distributed. We found 2 as Box Cox lambda, suggesting squared transformation. Therefore we Try Y^2 Transformation, we also tried many other transformations such as 1/Y, and decided to display log and square root as they improved from original model.
-- Normality: The Q-Q plot of residuals suggest residuals are approximately normal for square root and log, though slight deviations exist at the left tail. Note that the scale for the Square root graph is a lot bigger, minimal deviation indicates violation.
+
+## Response Variable Transformation and Assumption Comparison
 ```{r residual-plots}
 #| label: Response Variable Transformation Preview with QQ
 #| fig-cap: Residual Plots
 #| echo: false
+#| fig-width: 6
+#| fig-height: 3
 
 df_clean$OSSLT_Transform = log(df_clean$OSSLT_First_Attempt_PassRate+0.001)
 model_transformed <- lm(OSSLT_Transform ~ School_Type + School_Language + 
@@ -427,77 +428,132 @@ model_square <- lm(OSSLT_Square ~ School_Type + School_Language +
                        data = df_clean)
 
 
-# Q-Q plot for the original model
-p1 = ggplot(data.frame(resid(model)), aes(sample = resid(model))) +
+p1 <- ggplot(data.frame(resid = resid(model)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals")+
-  theme(plot.title = element_text(size = 10))
+  ggtitle("Q-Q Plot of Residuals") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-# Q-Q plot for the transformed model
-p2 = ggplot(data.frame(resid(model_transformed)), aes(sample = resid(model_transformed))) +
+# Q-Q plot for the log-transformed model
+p2 <- ggplot(data.frame(resid = resid(model_transformed)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(Log)")+
-  theme(plot.title = element_text(size = 10))
+  ggtitle("Q-Q Plot of Residuals (Log)") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p3 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
+# Q-Q plot for the sqrt-transformed model
+p3 <- ggplot(data.frame(resid = resid(model_sqrt)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(Sqrt)")+
-  theme(plot.title = element_text(size = 10))
+  ggtitle("Q-Q Plot of Residuals (Sqrt)") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p4 = ggplot(data.frame(resid(model_square)), aes(sample = resid(model_square))) +
+# Q-Q plot for the squared-transformed model
+p4 <- ggplot(data.frame(resid = resid(model_square)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(Square)")+
-  theme(plot.title = element_text(size = 10))
+  ggtitle("Q-Q Plot of Residuals (Square)") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
 grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
 
 # summary(model_transformed)
 ```
-### Response Variable Transformation Preview with Residuals
-- Linearity & Homoscedasticity: The Square Root residuals vs. fitted plot is ideal, as the Y scale range is a lot smaller than other transformations and there is no clear patterns. This suggest linearity. Slight heteroscedasticity is observed around x=-10.
+
+After fitting our original model, we consider some transformations. The first method is Box Cox, which uses maximum likelihood to choose transformation so the residuals are approximately normally distributed. We found 2 as Box Cox lambda, suggesting squared transformation. Therefore we Try $Y^2$ Transformation, we also tried many other transformations such as $1/Y$, and decided to display log and square root as they improved from original model.
+
+Normality: The Q-Q plot of residuals suggest residuals are approximately normal for square root and log, though slight deviations exist at the left tail. Note that the scale for the Square root graph is a lot bigger, minimal deviation indicates violation.
+
+## Response Variable Transformation Preview with Residuals
+
 ```{r residual-plots}
 #| label: Response Variable Transformation Preview with Residuals
 #| fig-cap: Residual Plots
 #| echo: false
+#| fig-width: 6
+#| fig-height: 3
 # Create individual ggplots
 p1 <- ggplot(data.frame(Fitted = model$fitted.values, Residuals = resid(model)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "blue") +
+  geom_point(color = "blue", size = 1) +
   ggtitle("Original Residuals") +
-  theme(plot.title = element_text(size = 10))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p2 <- ggplot(data.frame(Fitted = model_transformed$fitted.values, 
-                       Residuals = resid(model_transformed)), 
+p2 <- ggplot(data.frame(Fitted = model_transformed$fitted.values, Residuals = resid(model_transformed)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
+  geom_point(color = "red", size = 1) +
   ggtitle("Log-Transformed Residuals") +
-  theme(plot.title = element_text(size = 10))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-
-p3 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, 
-                       Residuals = resid(model_sqrt)), 
+p3 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, Residuals = resid(model_sqrt)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "darkgreen") +
+  geom_point(color = "darkgreen", size = 1) +
   ggtitle("Sqrt-Transformed Residuals") +
-  theme(plot.title = element_text(size = 10))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p4 <- ggplot(data.frame(Fitted = model_square$fitted.values, 
-                       Residuals = resid(model_square)), 
+p4 <- ggplot(data.frame(Fitted = model_square$fitted.values, Residuals = resid(model_square)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "purple") +
-  ggtitle("square-Transformed Residuals") +
-  theme(plot.title = element_text(size = 10))
+  geom_point(color = "purple", size = 1) +
+  ggtitle("Square-Transformed Residuals") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
 
 grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
 
 ```
-### Response Variable Transformation Metrics and Decision
-- We eliminate Square since the model performs worse in every aspect. Square Root and Log Transformation both rapidly improve from the original model based on AIC and BIC. However, R^2 dropped by approximately 34% compared to original for Log, indicating log model's ability to explain variance significantly decreased. In contrast, Square Root Model R^2 only decreased by less than 2% for better Normality, linearity and Homoscedasticity. The difference in AIC and between Log and Square Root is not significant enough to replace R^2. Therefore, we apply square root transformation on our response variable.
+
+Linearity & Homoscedasticity: The Square Root residuals vs. fitted plot is ideal, as the Y scale range is a lot smaller than other transformations and there is no clear patterns. This suggest linearity. Slight heteroscedasticity is observed around x=-10.
+
+## Response Variable Transformation Metrics and Decision
+We eliminate Square since the model performs worse in every aspect. Square Root and Log Transformation both rapidly improve from the original model based on AIC and BIC. However, $R^2$ dropped by approximately 34% compared to original for Log, indicating log model's ability to explain variance significantly decreased. In contrast, Square Root Model $R^2$ only decreased by less than 2% for better Normality, linearity and Homoscedasticity. The difference in AIC and between Log and Square Root is not significant enough to replace $R^2$. Therefore, we apply square root transformation on our response variable.
 ```{R}
 #| label: Y Transformation Decision
 #| tbl-cap: "R^2, AIC, BIC"
@@ -534,9 +590,8 @@ kable(ytransform_comparison, digits = 4, caption = "Model Comparison Based on Y-
 
 ```
 
-### Y transformed model summary, VIF and Confidence Interval
-- The confidence interval contains 0 and p value >0.05 for School_Type, suggest dropping this predictor.
-- Variance Inflation Factors>5 for all, indicating no predictor have issues with multicollinearity.
+## Y transformed model summary, VIF and Confidence Interval
+The confidence interval contains 0 and p value > 0.05 for School_Type, suggest dropping this predictor. Variance Inflation Factors > 5 for all, indicating no predictor have issues with multicollinearity.
 ```{r}
 #| label: VIF, Confidence Interval and Summary
 #| tbl-cap: "VIF, Confidence Interval and Summary"
@@ -631,36 +686,63 @@ model_OneLessPredictor <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low
 model_drop_No_Add <- lm(OSSLT_Sqrt ~ School_Language + Special_Ed_Pct + Low_Income_Transform + No_Edu_Transform, data = df_clean)
 
 ```
-### X Transformation Assumption Preview
-- Other than dropping School Type, we also consider X transformation. After testing different combinations of X transformations, we found that adding a squared special education term slightly increase model performance. Therefore we compare four models: Original with Sqrt(Y), remove school type, add squared special education, and both remove and add. All X transformations models shows similar residual plots. 
+## X Transformation Assumption Preview
+
+Other than dropping School Type, we also consider X transformation. After testing different combinations of X transformations, we found that adding a squared special education term slightly increase model performance. Therefore we compare four models: Original with Sqrt(Y), remove school type, add squared special education, and both remove and add. All X transformations models shows similar residual plots. 
+
 ```{R}
 #| label: QQ
-#| tbl-cap: "QQ of all possible X Transformation"
+#| fig-cap: "QQ of all possible X Transformation"
 #| echo: false
-p2 = ggplot(data.frame(resid(model_sqrt)), aes(sample = resid(model_sqrt))) +
+#| fig-width: 6
+#| fig-height: 3
+p2 <- ggplot(data.frame(resid = resid(model_sqrt)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of Residuals(sqrt)") +
-  theme(plot.title = element_text(size = 7))
+  ggtitle("Q-Q Plot of Residuals (sqrt)") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p3 = ggplot(data.frame(resid(model_Transformwith_x)), aes(sample = resid(model_Transformwith_x))) +
+p3 <- ggplot(data.frame(resid = resid(model_Transformwith_x)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
   ggtitle("Add Squared Special EDU") +
-  theme(plot.title = element_text(size = 7))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p4 = ggplot(data.frame(resid(model_OneLessPredictor)), aes(sample = resid(model_OneLessPredictor))) +
+p4 <- ggplot(data.frame(resid = resid(model_OneLessPredictor)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
   ggtitle("Drop School Type, Add Squared Spec EDU") +
-  theme(plot.title = element_text(size = 7))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p5 = ggplot(data.frame(resid(model_drop_No_Add)), aes(sample = resid(model_drop_No_Add))) +
+p5 <- ggplot(data.frame(resid = resid(model_drop_No_Add)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
   ggtitle("Drop School Type") +
-  theme(plot.title = element_text(size = 7))
-
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 grid.arrange( p2, p3, p4, p5, ncol = 2)
 
 ```
@@ -669,41 +751,62 @@ grid.arrange( p2, p3, p4, p5, ncol = 2)
 #| label: X Transformation Residual Plots
 #| fig-cap: Residual Plots
 #| echo: false
-p2 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, 
-                       Residuals = resid(model_sqrt)), 
+#| fig-width: 6
+#| fig-height: 3
+p2 <- ggplot(data.frame(Fitted = model_sqrt$fitted.values, Residuals = resid(model_sqrt)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
+  geom_point(color = "red", size = 1) +
   ggtitle("Sqrt Transformed only Y Residuals") +
-  theme(plot.title = element_text(size = 7))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p3 <- ggplot(data.frame(Fitted = model_Transformwith_x$fitted.values, 
-                       Residuals = resid(model_Transformwith_x)), 
+p3 <- ggplot(data.frame(Fitted = model_Transformwith_x$fitted.values, Residuals = resid(model_Transformwith_x)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
+  geom_point(color = "red", size = 1) +
   ggtitle("With Polynomial Term On Spec EDU") +
-  theme(plot.title = element_text(size = 7))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p4 <- ggplot(data.frame(Fitted = model_OneLessPredictor$fitted.values, 
-                       Residuals = resid(model_OneLessPredictor)), 
+p4 <- ggplot(data.frame(Fitted = model_OneLessPredictor$fitted.values, Residuals = resid(model_OneLessPredictor)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
+  geom_point(color = "red", size = 1) +
   ggtitle("Removing School Type with extra Term") +
-  theme(plot.title = element_text(size = 7))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p5 <- ggplot(data.frame(Fitted = model_drop_No_Add$fitted.values, 
-                       Residuals = resid(model_drop_No_Add)), 
+p5 <- ggplot(data.frame(Fitted = model_drop_No_Add$fitted.values, Residuals = resid(model_drop_No_Add)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
+  geom_point(color = "red", size = 1) +
   ggtitle("Removing School Type") +
-  theme(plot.title = element_text(size = 7))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
 grid.arrange(p2, p3, p4, p5, ncol = 2)
 ```
 
-### Predictor Transformation Metrics and Decision
--  R^2, AIC, BIC, RSS, F and P value all improved from models that has the Squared Special Education predictor. 
-- We decide to drop school type, since all metrics does not differ by much, indicating that this predictor has minimal impact on the model, or no relationships.
-- Finally, we can conclude the final model with 5 Predictors: School Language, Special Education Proportion, Special Education Squared, Low Income Proportion, Parents with minimal education proportion.
+
+## Predictor Transformation Metrics and Decision
+$R^2$, AIC, BIC, RSS, F and P value all improved from models that has the Squared Special Education predictor. We decide to drop school type, since all metrics does not differ by much, indicating that this predictor has minimal impact on the model, or no relationships. Finally, we can conclude the final model with 5 Predictors: School Language, Special Education Proportion, Special Education Squared, Low Income Proportion, Parents with minimal education proportion.
 ```{R}
 #| label: Predictor Transformation Decision
 #| tbl-cap: "Predictor Transformation Decision"
@@ -785,9 +888,10 @@ kable(results_df, digits = c(0, 4, 0, 0, 4, 4), caption = "Model Statistics Comp
 
 ```
 
-### Outlier Detection and Removal
-- To detect outliers, influential and leverage points. We tested observation for standardized and studentized residual for outliers; hat for leverage points; DFFITS, DFBETAS and Cook's Distance for influential points.
-- These columns (211, 385, 102, 118, 225, 484, 486, 488, 533) appear under several different tests, After observing their plot, we confirm to fit the model after removing these.
+## Outlier Detection and Removal
+To detect outliers, influential and leverage points. We tested observation for standardized and studentized residual for outliers; hat for leverage points; DFFITS, DFBETAS and Cook's Distance for influential points.
+
+These columns (211, 385, 102, 118, 225, 484, 486, 488, 533) appear under several different tests, After observing their plot, we confirm to fit the model after removing these.
 ```{R}
 #| include: false
 #| warning: false
@@ -907,8 +1011,8 @@ kable(outlier_table,
 
 ```
 
-### Assess Model Performance after removing outlier
-- AIC, BIC, R^2, F score, RSS all improved significantly after removing outliers, so we conclude the removing outlier process.
+## Assess Model Performance after removing outlier
+AIC, BIC, $R^2$, F score, RSS all improved significantly after removing outliers, so we conclude the removing outlier process.
 ```{R}
 #| label: Assess Model Performance after removing outlier
 #| tbl-cap: "Assess Model Performance after removing outlier"
@@ -955,39 +1059,65 @@ kable(Final_comparison, digits = c(0, 4, 2, 2, 4, 4), caption = "Model Compariso
 ```
 
 
-### QQ and Residual final comparsion
-- Both graphs improved with no outliers near the bound of scales.
+## QQ and Residual final comparsion
+Both graphs improved with no outliers near the bound of scales.
 ```{r residual-plots}
 #| label: QQ and Residual comparsion
 #| fig-cap: Residual Plots
 #| echo: false
-p2 <- ggplot(data.frame(Fitted = model_drop_No_Add$fitted.values, 
-                       Residuals = resid(model_drop_No_Add)), 
+p2 <- ggplot(data.frame(Fitted = model_drop_No_Add$fitted.values, Residuals = resid(model_drop_No_Add)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
-  ggtitle("Before removing outlier") +
-  theme(plot.title = element_text(size = 7))
+  geom_point(color = "red", size = 1) +
+  ggtitle("Before Removing Outlier") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p3 <- ggplot(data.frame(Fitted = model_clean$fitted.values, 
-                       Residuals = resid(model_clean)), 
+# Residual vs Fitted (After outlier removal)
+p3 <- ggplot(data.frame(Fitted = model_clean$fitted.values, Residuals = resid(model_clean)), 
              aes(Fitted, Residuals)) +
-  geom_point(color = "red") +
-  ggtitle("After Removing outlier") +
+  geom_point(color = "red", size = 1) +
+  ggtitle("After Removing Outlier") +
   ylim(-6.25, 2.5) +
-  theme(plot.title = element_text(size = 7))
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p4 = ggplot(data.frame(resid(model_drop_No_Add)), aes(sample = resid(model_drop_No_Add))) +
+# Q-Q plot before outlier removal
+p4 <- ggplot(data.frame(resid = resid(model_drop_No_Add)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
-  ggtitle("Q-Q Plot of one less predictor")+
-  theme(plot.title = element_text(size = 7))
+  ggtitle("Q-Q Plot of One Less Predictor") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
 
-p5 = ggplot(data.frame(resid(model_clean)), aes(sample = resid(model_clean))) +
+# Q-Q plot after outlier removal
+p5 <- ggplot(data.frame(resid = resid(model_clean)), aes(sample = resid)) +
   stat_qq() +
   stat_qq_line(color = "red") +
   ylim(-6.25, 2.5) +
-  ggtitle("Q-Q Plot of After remove outlier")+
-  theme(plot.title = element_text(size = 7))
+  ggtitle("Q-Q Plot After Removing Outlier") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 7),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank()
+  )
+
 
 grid.arrange( p2, p3, p4, p5, ncol = 2)
 ```
@@ -1031,6 +1161,7 @@ full_table <- full_table %>%
     term == "Special_Ed_Pct" ~ "% in Special Education",
     term == "Low_Income_Transform" ~ "% in Low Income",
     term == "No_Edu_Transform" ~ "% in No Educated Parent ",
+    term == "Sp_Ed_Transform" ~ "% in Special Education (Squared)",
     TRUE ~ term  
   ))
 
@@ -1051,10 +1182,12 @@ full_table[, c("term", "Estimate", "Std. Error", "t value", "Pr(>|t|)", "Lower 9
 
 ## Model Interpretation 
 
-The regression results presented in @tbl-final-model-regression-coef provide meaningful insight into how school and family level factors influence OSSLT first attempt success rates in Ontario. Notably, the language of instruction emerges as a significant predictor: schools offering instruction in French are associated with higher OSSLT performance, holding all other variables in the model constant. Specifically, French language schools are predicted to have a 0.3108 unit increase in the square root of the OSSLT first attempt pass rate compared to English language schools. The 95% confidence interval for this estimate ranges from 0.2099 to 0.4118, indicating a consistently positive effect that is statistically significant. 
+The regression results presented in @tbl-final-model-regression-coef provide meaningful insight into how school and family level factors influence OSSLT first attempt success rates in Ontario. Among the school characteristics, the language of instruction stands out as a significant predictor: schools offering instruction in French are associated with higher OSSLT performance, holding all other variables constant. Specifically, French-language schools are predicted to have a 0.31 unit increase in the square root of the OSSLT first attempt pass rate compared to English-language schools, with a 95% confidence interval ranging from 0.2099 to 0.4118, indicating a consistently positive and statistically significant effect.
 
-In contrast, three key indicators of socioeconomic and educational disadvantage are all significantly associated with lower OSSLT performance: the percentage of students receiving special education services, the percentage of school aged children living in low income households, and the percentage of students whose parents have no degree, diploma, or certificate. 
-For each one percentage point increase in students receiving special education, there is an estimated 0.0136 unit decrease in the square root of the OSSLT pass rate, with a 95% confidence interval ranging from -0.0209 to -0.0062. Likewise, each additional percentage point of students from low income households is associated with a 0.0116 unit decrease, with the confidence interval ranging from -0.0168 to -0.0064. Finally, each percentage point increase in students whose parents lack post secondary education corresponds to a 0.0310 unit decrease in the transformed OSSLT outcome, with a confidence interval between -0.0379 and -0.0242. The narrow confidence intervals for all predictors suggest that the estimated effects are both precise and robust.
+A particularly important finding concerns the impact of special education. Rather than following a simple linear pattern, the percentage of students receiving special education services shows a nonlinear effect on OSSLT outcomes. The model includes both a linear and a squared term for this predictor. The linear term has a negative coefficient of -0.0136, while the squared term is also negative and statistically significant, with a coefficient of -0.0003. This suggests that the negative effect of special education becomes increasingly severe as the proportion of students in special education rises, indicating a compounding disadvantage in schools with especially high concentrations of these students.
+
+In addition, two other indicators of socioeconomic disadvantage, the percentage of students from low-income households and the percentage whose parents have no post-secondary education, are both significantly associated with lower OSSLT performance. Each one-percentage-point increase in students from low-income households corresponds to a 0.0116 unit decrease in the square root of the OSSLT pass rate (95% CI: -0.0168 to -0.0064), while each additional percentage point of students whose parents lack formal post-secondary credentials is associated with a 0.0310 unit decrease (95% CI: -0.0379 to -0.0242). The narrow confidence intervals across all predictors indicate that the estimated effects are both precise and robust.
+
 
 ## Comparing with Literature
 
@@ -1100,48 +1233,14 @@ Beyond explanatory power, model selection criteria such as the Akaike Informatio
 
 The distinction between AIC and AICc lies in their intended use: AICc is a bias-corrected version of AIC that is particularly useful when the sample size is small or when the number of estimated parameters is a moderate to large fraction of the sample size. According to the rule of thumb provided by @burnham2004multimodel, AICc is preferred over AIC when the sample size $n \leq 40(p + 2)$ where p is the number of predictors. Based on this criterion, our dataset includes around eight hundred observations and only four predictors, which indicates that AIC is a more suitable measure for evaluating our model. This explains how only AIC is used for analysis throughout this report.
 
+# Discussion and conclusion
 
-\newpage
+# Author contributions
+- **Junyi Hou** : Contributed to Introduction section and  Model Selection section
+- **Luhan Wang**: Contributed to Primary Model Results and Diagnostics section and Discussion and Conclusion section
+- **Xuanle Zhou** : Contributed to the Data Description section and Final Model Inference and Results section
 
-\appendix
+All team members contributed to the overall analysis, editing, and refinement of the final report.
 
-# Appendix
-```{r}
-library(gridExtra)
-
-# Add fitted values to df_clean
-df_clean$fitted_values <- model$fitted.values
-
-# Function for ggplot with regression line
-ggplot_with_abline <- function(df, xcol, xlabel) {
-  ggplot(df, aes(x = .data[[xcol]], y = fitted_values)) +
-    geom_point(color = "blue") +
-    geom_smooth(method = "lm", color = "red", se = FALSE) +
-    labs(title = paste(xlabel, "vs y-hat"), x = xlabel, y = "y-hat") +
-    theme_minimal()
-}
-
-# Create plots
- # Create boxplot for School_Type
-p1 <- ggplot(df_clean, aes(x = School_Type, y = fitted_values)) +
-  geom_boxplot(aes(fill = School_Type), outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
-  labs(title = "School Type vs y-hat", x = "School Type", y = "y-hat") +
-  theme_minimal()
-
-# Create boxplot for School_Language
-p2 <- ggplot(df_clean, aes(x = School_Language, y = fitted_values)) +
-  geom_boxplot(aes(fill = School_Language), outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
-  labs(title = "School Language vs y-hat", x = "School Language", y = "y-hat") +
-  theme_minimal()
-
-p3 <- ggplot_with_abline(df_clean, "Special_Ed_Pct", "Special Ed Pct")
-p4 <- ggplot_with_abline(df_clean, "Low_Income_Pct", "Low Income Pct")
-
-
-p5 <- ggplot_with_abline(df_clean, "No_Parent_Degree_Pct", "No Parent Degree Pct")
-
-# Arrange plots in a grid
-grid.arrange(p1, p2, p3, p4, p5, ncol = 3, nrow = 2)
-```
 \newpage
 # References
