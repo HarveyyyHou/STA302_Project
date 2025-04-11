@@ -1235,6 +1235,57 @@ The distinction between AIC and AICc lies in their intended use: AICc is a bias-
 
 # Discussion and conclusion
 
+This study set out to explore how various school and family-related factors influence students’ success on the first attempt of the OSSLT in Ontario. By building a multiple linear regression model and refining it through transformations and diagnostic checks, we reached several important conclusions that deepen our understanding of student literacy outcomes.
+
+## Key Findings
+
+One of the most important findings is that **socioeconomic factors**—especially **family income** and **parental education level**—are strongly linked to OSSLT performance. Schools with more students from **low-income households** or with **parents lacking post-secondary education** tended to have **lower pass rates**, supporting earlier research like Zhang et al. (2020). For every 1% increase in low-income students, the pass rate (transformed) decreased by 0.0116 units, while a 1% increase in students whose parents did not attend post-secondary education resulted in a 0.0310 unit drop.
+
+The impact of **special education services** was also significant. By including both a linear and a squared term for this variable, the model revealed a **nonlinear, compounding negative effect**—performance declines became steeper as the percentage of students receiving special education increased. This aligns with Vaughn and Wanzek’s (2014) findings that students in special education face greater academic challenges, even with support.
+
+Surprisingly, **French-language schools outperformed English-language schools**, even though the OSSLT is conducted in English. This suggests that French schools may benefit from stronger instructional strategies, better resources, or more cohesive school environments, despite potential language barriers.
+
+In contrast, **school type (Catholic vs. Public)** was not a significant predictor. Although previous research (e.g., Cheema, 2024) suggests that religious or structured schooling can enhance academic performance, our results indicate that other factors—like income and parental education—have a much stronger influence on OSSLT outcomes.
+
+## Recommendations
+
+Based on these findings, we suggest several steps that could help improve student outcomes on the OSSLT:
+
+- **Targeted support for schools with higher needs:** Schools with a large proportion of low-income families or students with limited parental education should receive more funding and resources. This might include tutoring programs, school-wide literacy interventions, or family engagement initiatives.
+- **Stronger special education support:** The compounding negative effect of special education proportions suggests that simply offering services may not be enough. Schools may need **more specialized staff**, **better training**, or **innovative teaching methods** to better support these students.
+- **Learning from French-language schools:** Since French-language schools performed better, it could be useful to study their practices more closely. Sharing strategies across school boards might help improve English-language school outcomes as well.
+- **Policy changes based on evidence:** Policymakers should consider incorporating these findings into provincial education policy. For instance, funding formulas might be adjusted to better reflect schools’ needs based on demographics like income and parental education.
+
+## Limitations
+
+Despite the strengths of this study, there are several **limitations** to consider.
+
+- **Snapshot Data: **Our study is based on cross-sectional data, which captures a single moment in time. This means we can observe associations between variables, but we cannot establish cause-and-effect relationships. For instance, while we found a link between parental education and OSSLT performance, we cannot confirm that one directly causes the other.
+- **Limited View of Literacy: ** The OSSLT pass rate is a standardized measure of English literacy, but it may not fully reflect students’ actual language skills. Some students may perform poorly on tests despite being strong readers or communicators in everyday life. As a result, our outcome variable may miss other important aspects of literacy.
+- **Missing Influential Factors: **Our model only includes a small set of predictors. Other key influences on student performance—such as teacher effectiveness, school resources, peer environments, or mental health services—were not part of our dataset. These unmeasured variables could play a significant role in OSSLT outcomes.
+- **Outlier Exclusion Trade-off: **To improve model accuracy, we removed several statistical outliers. However, these outliers may represent meaningful cases, such as schools with exceptional challenges or innovative practices. Excluding them improves model fit but reduces our ability to understand these unique situations.
+- **Interpretation Challenges from Transformation: **We applied a square root transformation to meet regression assumptions. While this improved the statistical validity of the model, it made the results harder to interpret. Stakeholders like educators or policymakers may find transformed outcomes less intuitive than raw pass rates.
+- **Oversimplified Relationships: **Our model uses a linear regression framework, which assumes that the relationships between variables are consistent and additive. However, educational outcomes are often shaped by more complex dynamics, such as interaction effects or non-linear trends, which our model may not fully capture.
+
+## Suggestions for Future Research
+
+To address these limitations and build on our findings, future studies could:
+
+- **Incorporate Cross-Validation for Better Generalization: **Future work should use **cross-validation techniques**, such as **K-fold CV or LOOCV**, to assess model stability and predictive performance on unseen data. This approach can help ensure the results are not overly dependent on the specific training data, improving generalization and reducing the risk of overfitting.
+- **Apply Regularization to Control Model Complexity:** Techniques like **LASSO** and **Ridge regression** can be used to penalize overly complex models. These methods improve prediction by shrinking or removing irrelevant coefficients, reducing overfitting while keeping essential predictors.
+- **Use Validation-Based Model Selection:** Future studies should compare multiple models—including versions with interaction or polynomial terms—and select the one with the best **validation performance**. This ensures a better balance between fit and simplicity.
+- **Expand the Set of Predictors with Caution:** Including more variables, such as **teacher experience**, **school funding**, or **student engagement**, may improve model accuracy. However, to manage the risk of overfitting, regularization or **variable selection** should be applied alongside.
+- **Validate with a Test Set:** To assess how well the model predicts new data, researchers should split the data into a **training set** and a **test set**, using the test set strictly for model evaluation. This simulates real-world prediction scenarios.
+- **Explore Interaction and Nonlinear Effects:** Rather than assuming relationships are additive or linear, future work could explore **interaction terms** and **nonlinear models** (e.g., splines or decision trees) to better reflect complex educational dynamics.
+- **Compare Across Regions or Systems:** Applying similar models to **other provinces or countries** would test whether findings hold across different educational contexts. This helps assess the **generalizability** of the results.
+- **Integrate Longitudinal or Time-Series Approaches:** Tracking student or school data over time allows the use of **autoregressive models** to study how factors evolve and influence OSSLT outcomes in the long term.
+
+## Final Thoughts
+
+In conclusion, this study provides valuable insights into how school-level and family-level factors influence OSSLT success across Ontario. Socioeconomic disadvantage, particularly low income and parental education, emerged as strong predictors of lower test performance. Special education services also had a clear and compounding negative effect. On the other hand, French-language schools unexpectedly outperformed English-language ones, opening new questions about what contributes to school success beyond just language.
+
+Although we found no significant impact from school type, our results highlight that improving educational outcomes in Ontario requires **targeted support, informed policy, and a better understanding of local school environments**. By addressing the challenges identified in this study, educators and policymakers can work toward a more equitable and effective education system for all students.
+
 # Author contributions
 - **Junyi Hou** : Contributed to Introduction section and  Model Selection section
 - **Luhan Wang**: Contributed to Primary Model Results and Diagnostics section and Discussion and Conclusion section
