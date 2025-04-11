@@ -1239,13 +1239,13 @@ This study set out to explore how various school and family-related factors infl
 
 ## Key Findings
 
-One of the most important findings is that **socioeconomic factors**—especially **family income** and **parental education level**—are strongly linked to OSSLT performance. Schools with more students from **low-income households** or with **parents lacking post-secondary education** tended to have **lower pass rates**, supporting earlier research like Zhang et al. (2020). For every 1% increase in low-income students, the pass rate (transformed) decreased by 0.0116 units, while a 1% increase in students whose parents did not attend post-secondary education resulted in a 0.0310 unit drop.
+One of the most important findings is that **socioeconomic factors**—especially **family income** and **parental education level**—are strongly linked to OSSLT performance. Schools with more students from **low-income households** or with **parents lacking post-secondary education** tended to have **lower pass rates**, supporting earlier research like @zhang2020family. For every 1% increase in low-income students, the pass rate (transformed) decreased by 0.0116 units, while a 1% increase in students whose parents did not attend post-secondary education resulted in a 0.0310 unit drop.
 
-The impact of **special education services** was also significant. By including both a linear and a squared term for this variable, the model revealed a **nonlinear, compounding negative effect**—performance declines became steeper as the percentage of students receiving special education increased. This aligns with Vaughn and Wanzek’s (2014) findings that students in special education face greater academic challenges, even with support.
+The impact of **special education services** was also significant. By including both a linear and a squared term for this variable, the model revealed a **nonlinear, compounding negative effect**—performance declines became steeper as the percentage of students receiving special education increased. This aligns with @vaughn2014intensive findings that students in special education face greater academic challenges, even with support.
 
 Surprisingly, **French-language schools outperformed English-language schools**, even though the OSSLT is conducted in English. This suggests that French schools may benefit from stronger instructional strategies, better resources, or more cohesive school environments, despite potential language barriers.
 
-In contrast, **school type (Catholic vs. Public)** was not a significant predictor. Although previous research (e.g., Cheema, 2024) suggests that religious or structured schooling can enhance academic performance, our results indicate that other factors—like income and parental education—have a much stronger influence on OSSLT outcomes.
+In contrast, **school type (Catholic vs. Public)** was not a significant predictor. Although previous research (e.g., @cheema2024difference) suggests that religious or structured schooling can enhance academic performance, our results indicate that other factors—like income and parental education—have a much stronger influence on OSSLT outcomes.
 
 ## Recommendations
 
